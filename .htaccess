@@ -1,0 +1,15 @@
+# Activar Rewrite Engine
+RewriteEngine On
+
+# Redirigir todo a index.php excepto archivos y carpetas existentes
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*)$ index.php?route=$1 [QSA,L]
+
+# Bloquear archivos sensibles
+<FilesMatch "^\.env|\.log$|\.sql$|composer\.(json|lock)$">
+    Require all denied
+</FilesMatch>
+
+# Deshabilitar listado de directorios
+Options -Indexes
