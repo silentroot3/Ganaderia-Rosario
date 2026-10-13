@@ -1,9 +1,20 @@
 <?php
+
+require_once __DIR__ . '/../../includes/config.php';
+
+// Redirigir al login (registro deshabilitado)
+header('Location: ' . BASE_URL . '/login');
+exit;
+
+
 // Si ya está logueado, redirigir
 if (isset($_SESSION['user_id'])) {
     header('Location: ' . BASE_URL . '/dashboard');
     exit;
 }
+
+
+
 
 $csrf_token = generarCSRF();
 $error = '';

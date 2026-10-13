@@ -32,7 +32,9 @@ function hasAnyRole($roles) {
     return in_array($_SESSION['user_rol'], $roles);
 }
 
-function redirigirPorRol() {
-    header('Location: ' . BASE_URL . '/dashboard');
-    exit;
+if (!function_exists('redirigirPorRol')) {
+    function redirigirPorRol() {
+        header('Location: ' . BASE_URL . '/dashboard');
+        exit;
+    }
 }

@@ -5,6 +5,15 @@ if (isset($_SESSION['user_id'])) {
     exit;
 }
 
+
+require_once __DIR__ . '/../../includes/config.php';
+
+// Si ya está logueado, redirigir al dashboard
+if (isset($_SESSION['user_id'])) {
+    redirigirPorRol();
+    exit;
+}
+	
 // Generar token CSRF
 $csrf_token = generarCSRF();
 

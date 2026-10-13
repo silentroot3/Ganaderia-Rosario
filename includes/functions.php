@@ -25,6 +25,20 @@ function generarCSRF() {
     return $_SESSION['csrf_token'];
 }
 
+
+/**
+ * Redirige al usuario al dashboard según su rol
+ * Si no está logueado, va al login
+ */
+function redirigirPorRol() {
+    if (!isset($_SESSION['user_id'])) {
+        header('Location: ' . BASE_URL . '/login');
+        exit;
+    }
+    header('Location: ' . BASE_URL . '/dashboard');
+    exit;
+}
+
 // Función para verificar token CSRF
 function verificarCSRF($token) {
     if (empty($_SESSION['csrf_token']) || empty($token)) {

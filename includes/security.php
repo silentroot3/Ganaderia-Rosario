@@ -106,15 +106,16 @@ function registrarIntentoFallido($email) {
     registrarLog(null, 'login_fallido', "Intento fallido para email: $email");
 }
 
+
 // Función para crear sesión de usuario
 function crearSesionUsuario($usuario) {
     // Generar token de sesión
     $token = generarToken();
-    
+
     // Guardar sesión en BD
     $db = Database::getInstance();
     $db->execute(
-        "INSERT INTO sesiones (usuario_id, token, ip, user_agent) 
+        "INSERT INTO sesiones (usuario_id, token, ip, user_agent)
          VALUES (?, ?, ?, ?)",
         [
             $usuario['id'],
@@ -123,30 +124,31 @@ function crearSesionUsuario($usuario) {
             obtenerUserAgent()
         ]
     );
-    
+
     // Actualizar último acceso
     $db->execute(
         "UPDATE usuarios SET ultimo_acceso = NOW() WHERE id = ?",
         [$usuario['id']]
     );
-    
-    // Resetear intentos fallidos
-    $db->execute(
-        "UPDATE usuarios SET intentos_fallidos = 0, bloqueado_hasta = NULL WHERE id = ?",
-        [$usuario['id']]
-    );
-    
-    // Guardar en sesión
-    $_SESSION['user_id'] = $usuario['id'];
-    $_SESSION['user_email'] = $usuario['email'];
-    $_SESSION['user_nombre'] = $usuario['nombre'] . ' ' . $usuario['apellido'];
-    $_SESSION['user_rol'] = $usuario['rol'];
+
+
+    // ============================================
+    // GUARDAR DATOS EN LA SESIÓN
+    // ============================================
+    $_SESSION['user_id']       = $usuario['id'];
+    $_SESSION['nombre']        = $usuario['nombre'];
+    $_SESSION['apellido']      = $usuario['apellido'] ?? '';
+    $_SESSION['email']         = $usuario['email'];
+    $_SESSION['rol']           = $usuario['rol'];          
+    $_SESSION['user_rol']      = $usuario['rol'];           
     $_SESSION['session_token'] = $token;
     $_SESSION['last_activity'] = time();
-    $_SESSION['ip'] = obtenerIP();
-    $_SESSION['user_agent'] = obtenerUserAgent();
-    
-    // Registrar log de login
-    registrarLog($usuario['id'], 'login', 'Inicio de sesión');
+    $_SESSION['ip']            = obtenerIP();
+
+    return true;
 }
+
+
+
+
 ?>

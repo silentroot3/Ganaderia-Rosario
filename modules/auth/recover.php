@@ -4,6 +4,8 @@ $error = '';
 $success = '';
 $email = '';
 
+require_once __DIR__ . '/../../includes/config.php';
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!verificarCSRF($_POST['csrf_token'] ?? '')) {
         $error = 'Error de seguridad. Por favor, recargue la página.';

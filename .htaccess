@@ -1,15 +1,30 @@
-# Activar Rewrite Engine
 RewriteEngine On
+RewriteBase /
 
-# Redirigir todo a index.php excepto archivos y carpetas existentes
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule ^(.*)$ index.php?route=$1 [QSA,L]
+# Módulos - URLs limpias
+RewriteRule ^dashboard/?$ modules/dashboard/index.php [L,QSA]
+RewriteRule ^recepcion/?$ modules/recepcion/index.php [L,QSA]
+RewriteRule ^sanidad/?$ modules/sanidad/index.php [L,QSA]
+RewriteRule ^clasificacion/?$ modules/clasificacion/index.php [L,QSA]
+RewriteRule ^corrales/?$ modules/corrales/index.php [L,QSA]
+RewriteRule ^alimentacion/?$ modules/alimentacion/index.php [L,QSA]
+RewriteRule ^tratamientos/?$ modules/tratamientos/index.php [L,QSA]
+RewriteRule ^seguimiento/?$ modules/seguimiento/index.php [L,QSA]
+RewriteRule ^costos/?$ modules/costos/index.php [L,QSA]
+RewriteRule ^ventas/?$ modules/ventas/index.php [L,QSA]
+RewriteRule ^reportes/?$ modules/reportes/index.php [L,QSA]
+RewriteRule ^trazabilidad/?$ modules/trazabilidad/index.php [L,QSA]
+RewriteRule ^alertas/?$ modules/alertas/index.php [L,QSA]
+RewriteRule ^usuarios/?$ modules/usuarios/index.php [L,QSA]
+RewriteRule ^configuracion/?$ modules/configuracion/index.php [L,QSA]
+RewriteRule ^bovinos/?$ modules/bovinos/index.php [L,QSA]
 
-# Bloquear archivos sensibles
-<FilesMatch "^\.env|\.log$|\.sql$|composer\.(json|lock)$">
-    Require all denied
-</FilesMatch>
+# Errores
+RewriteRule ^403/?$ modules/errors/403.php [L,QSA]
 
-# Deshabilitar listado de directorios
-Options -Indexes
+# Auth (ya existe)
+RewriteRule ^login/?$ modules/auth/login.php [L,QSA]
+RewriteRule ^logout/?$ modules/auth/logout.php [L,QSA]
+
+# Módulo detalle/crear/editar (genérico)
+RewriteRule ^([a-z]+)/([a-z]+)/?$ modules/$1/$2.php [L,QSA]
