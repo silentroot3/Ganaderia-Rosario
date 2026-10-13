@@ -1,0 +1,43 @@
+# Archivos generados (LaTeX, Python, etc.)
+*.aux
+*.log
+*.out
+*.toc
+*.synctex.gz
+*.fls
+*.fdb_latexmk
+
+# Documentos PDF (opcional, descomentar si quieres ignorarlos)
+# documentacion/*.pdf
+# tareas/*.pdf
+
+# Backups
+backup.zip
+*.tar.gz
+*.bak
+
+# Configuración local
+.env
+.env.local
+*.local
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Composer
+/vendor/
+
+# Node
+node_modules/
+
+# Uploads (opcional)
+# uploads/*
+
