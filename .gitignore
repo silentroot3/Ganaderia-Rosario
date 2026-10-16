@@ -41,3 +41,56 @@ node_modules/
 # Uploads (opcional)
 # uploads/*
 
+# ============================================
+# BACKUPS Y TEMPORALES
+# ============================================
+*.bak
+*.bak2
+*.bak_*
+*.backup
+backup.zip
+*.tar.gz
+*.zip
+*.log
+*.tmp
+*~
+
+# ============================================
+# ARCHIVOS GENERADOS (NO versionar)
+# ============================================
+uploads/archivos/*.txt
+uploads/archivos/*.csv
+uploads/recepciones/*
+uploads/heridas/*
+uploads/documentos/*
+!uploads/archivos/.gitkeep
+!uploads/recepciones/.gitkeep
+!uploads/heridas/.gitkeep
+!uploads/documentos/.gitkeep
+
+# ============================================
+# CONFIGURACION LOCAL
+# ============================================
+.env
+.env.local
+*.local
+
+# ============================================
+# SISTEMA
+# ============================================
+.DS_Store
+Thumbs.db
+
+# ============================================
+# IDE
+# ============================================
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ============================================
+# NODE
+# ============================================
+node_modules/
+vendor/
