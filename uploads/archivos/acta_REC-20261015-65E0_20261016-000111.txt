@@ -1,0 +1,43 @@
+===============================================
+  GANADERIA EL ROSARIO
+  ACTA DE RECEPCION
+===============================================
+
+Folio: REC-20261015-65E0
+Fecha: 16/10/2026 00:01
+Proveedor: Ganadería Los Pinos
+Transporte: 1
+Placas: FDE3134L
+Chofer: Pedro Garcia
+
+===============================================
+  RESUMEN DE RECEPCION
+===============================================
+
+Total de animales que llegaron:          100
+Bajas registradas:                       0
+  - Muertes:                             0
+  - Devoluciones:                        0
+TOTAL RECIBIDO:                          2
+
+Machos:                                  1
+Hembras:                                 1
+En hospital:                             0
+
+Peso total recibido:                     490.00 kg
+Peso promedio:                           245.00 kg
+Valor estimado:                          $39470.00 MXN
+
+===============================================
+  DETALLE DE BOVINOS RECIBIDOS (VIVOS)
+===============================================
+
+SINIIGA         SEXO RAZA       CATEGORIA    PESO     ESTADO    
+---------------------------------------------------------------------------
+123141241234    H    Angus      Ternero      240.00   SANO      
+803485242945    M    Angus      Novillo      250.00   SANO      
+---------------------------------------------------------------------------
+TOTAL: 2 animales | Peso: 490.00 kg | Valor: $39470.00 MXN
+
+Contacto: 657-136-32-83
+===============================================

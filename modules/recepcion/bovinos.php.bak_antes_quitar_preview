@@ -1,0 +1,651 @@
+<?php
+// ============================================
+// REGISTRAR BOVINOS EN UNA RECEPCION
+// Con estado: Vivo / Muerto / Devuelto
+// ============================================
+
+require_once __DIR__ . '/../../includes/config.php';
+require_once __DIR__ . '/../../includes/categorizacion.php';
+require_once __DIR__ . '/../../includes/generar_archivos.php';
+require_once __DIR__ . '/../../includes/asignacion_corrales.php';
+
+$recepcion_id = (int)($_GET['id'] ?? 0);
+if (!$recepcion_id) {
+    header('Location: ' . BASE_URL . '/recepcion');
+    exit;
+}
+
+if (!isset($_SESSION['user_id'])) {
+    header('Location: ' . BASE_URL . '/login');
+    exit;
+}
+
+$error = '';
+$exito = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    try {
+        $db = Database::getInstance()->getConnection();
+        $accion = $_POST['accion'] ?? '';
+        
+        // ============================================
+        // AGREGAR BOVINO (vivo, muerto o devuelto)
+        // ============================================
+        if ($accion === 'agregar') {
+            $id_siniiga = trim($_POST['id_siniiga'] ?? '');
+            $sexo = $_POST['sexo'] ?? '';
+            $raza = trim($_POST['raza'] ?? '');
+            $peso = (float)($_POST['peso_entrada'] ?? 0);
+            $edad = (int)($_POST['edad_meses'] ?? 0);
+            $color = trim($_POST['color'] ?? '');
+            $observaciones = trim($_POST['observaciones'] ?? '');
+            $estadoBovino = $_POST['estado_bovino'] ?? 'vivo';
+            $motivoBaja = trim($_POST['motivo_baja'] ?? '');
+            $observacionesBaja = trim($_POST['observaciones_baja'] ?? '');
+            
+            // Validaciones basicas
+            if (!preg_match('/^\d{12}$/', $id_siniiga)) {
+                throw new Exception('El ID SINIIGA debe tener exactamente 12 digitos');
+            }
+            if (!in_array($sexo, ['M', 'H'])) {
+                throw new Exception('Debe seleccionar Macho o Hembra');
+            }
+            if ($peso <= 0) {
+                throw new Exception('El peso debe ser mayor a 0');
+            }
+            
+            // Validacion si es baja
+            if (in_array($estadoBovino, ['muerto', 'devuelto'])) {
+                if (empty($motivoBaja)) {
+                    throw new Exception('Debe indicar el motivo de la baja');
+                }
+            }
+            
+            // Verificar duplicado
+            $stmt = $db->prepare("SELECT id FROM bovinos WHERE id_siniiga = ?");
+            $stmt->execute([$id_siniiga]);
+            if ($stmt->fetch()) {
+                throw new Exception('El SINIIGA ' . $id_siniiga . ' ya esta registrado');
+            }
+            
+            // Categorizar
+            $cat = categorizarBovino($sexo, $peso);
+            
+            // ============================================
+            // CASO 1: BOVINO VIVO
+            // ============================================
+            if ($estadoBovino === 'vivo') {
+                $esEnfermo = isset($_POST['es_enfermo']) && $_POST['es_enfermo'] == '1';
+                $motivoHospital = trim($_POST['motivo_hospital'] ?? '');
+                
+                if ($esEnfermo && empty($motivoHospital)) {
+                    throw new Exception('Debe indicar el motivo para enviar a hospital');
+                }
+                
+                $corral = encontrarCorralAdecuado($sexo, $peso, $esEnfermo);
+                if (!$corral) {
+                    $tipoCorral = $esEnfermo ? 'hospital' : 'corral';
+                    throw new Exception("No hay {$tipoCorral} disponible para " . 
+                        ($sexo === 'M' ? 'macho' : 'hembra') . " de {$peso} kg");
+                }
+                
+                $stmt = $db->prepare("
+                    INSERT INTO bovinos 
+                    (recepcion_id, id_siniiga, sexo, raza, peso_entrada, categoria, edad_meses, color, observaciones, 
+                     estado, corral_id, corral_original_id, en_hospital, motivo_hospital, fecha_entrada_hospital)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ");
+                
+                $estado = $esEnfermo ? 'en_cuarentena' : 'en_corral';
+                $corralOriginal = $esEnfermo ? null : $corral['id'];
+                $enHospital = $esEnfermo ? 1 : 0;
+                $fechaHospital = $esEnfermo ? date('Y-m-d H:i:s') : null;
+                
+                $stmt->execute([
+                    $recepcion_id, $id_siniiga, $sexo, $raza, $peso, 
+                    $cat['subcategoria'], $edad, $color, $observaciones,
+                    $estado, $corral['id'], $corralOriginal, $enHospital, 
+                    $motivoHospital ?: null, $fechaHospital
+                ]);
+                
+                $bovino_id = $db->lastInsertId();
+                
+                $db->prepare("UPDATE corrales SET ocupacion_actual = ocupacion_actual + 1 WHERE id = ?")
+                   ->execute([$corral['id']]);
+                
+                $tipoMov = $esEnfermo ? 'hospital' : 'clasificacion';
+                $motivoMov = $esEnfermo ? $motivoHospital : 'Asignacion automatica por sexo/peso';
+                
+                $db->prepare("
+                    INSERT INTO movimientos_bovino 
+                    (bovino_id, corral_origen_id, corral_destino_id, tipo_movimiento, motivo, usuario_id, fecha)
+                    VALUES (?, NULL, ?, ?, ?, ?, NOW())
+                ")->execute([$bovino_id, $corral['id'], $tipoMov, $motivoMov, $_SESSION['user_id']]);
+                
+                if ($esEnfermo) {
+                    $exito = "Bovino {$id_siniiga} enviado a {$corral['nombre']} por: {$motivoHospital}";
+                } else {
+                    $exito = "Bovino {$id_siniiga} asignado a {$corral['nombre']} ({$cat['nombre_completo']} - \${$cat['precio_kg']}/kg)";
+                }
+            }
+            // ============================================
+            // CASO 2: BOVINO MUERTO O DEVUELTO
+            // ============================================
+            else {
+                $stmt = $db->prepare("
+                    INSERT INTO bovinos 
+                    (recepcion_id, id_siniiga, sexo, raza, peso_entrada, categoria, edad_meses, color, observaciones, 
+                     estado, motivo_baja, observaciones_baja, fecha_baja)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+                ");
+                
+                $stmt->execute([
+                    $recepcion_id, $id_siniiga, $sexo, $raza, $peso, 
+                    $cat['subcategoria'], $edad, $color, $observaciones,
+                    $estadoBovino, $motivoBaja, $observacionesBaja
+                ]);
+                
+                $bovino_id = $db->lastInsertId();
+                
+                // Registrar movimiento
+                $tipoMov = $estadoBovino === 'muerto' ? 'muerte' : 'regreso';
+                $db->prepare("
+                    INSERT INTO movimientos_bovino 
+                    (bovino_id, corral_origen_id, corral_destino_id, tipo_movimiento, motivo, usuario_id, fecha)
+                    VALUES (?, NULL, NULL, ?, ?, ?, NOW())
+                ")->execute([$bovino_id, $tipoMov, $motivoBaja, $_SESSION['user_id']]);
+                
+                $estadoLabel = $estadoBovino === 'muerto' ? 'MUERTO' : 'DEVUELTO';
+                $exito = "Bovino {$id_siniiga} registrado como {$estadoLabel} - Motivo: {$motivoBaja}";
+            }
+        }
+        
+        // ============================================
+        // FINALIZAR RECEPCION
+        // ============================================
+        if ($accion === 'finalizar') {
+            $stmt = $db->prepare("
+                SELECT 
+                    COUNT(*) AS total,
+                    SUM(CASE WHEN estado NOT IN ('muerto', 'devuelto') THEN 1 ELSE 0 END) AS vivos,
+                    SUM(CASE WHEN estado IN ('muerto', 'devuelto') THEN 1 ELSE 0 END) AS bajas,
+                    SUM(CASE WHEN estado NOT IN ('muerto', 'devuelto') THEN peso_entrada ELSE 0 END) AS peso_vivos
+                FROM bovinos 
+                WHERE recepcion_id = ?
+            ");
+            $stmt->execute([$recepcion_id]);
+            $totales = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if ($totales['total'] == 0) {
+                throw new Exception('Debe registrar al menos un bovino');
+            }
+            
+            $db->prepare("
+                UPDATE recepciones 
+                SET estado = 'completado',
+                    cantidad_recibida = ?,
+                    cantidad_bajas = ?,
+                    peso_total_recibido = ?
+                WHERE id = ?
+            ")->execute([
+                $totales['vivos'] ?? 0,
+                $totales['bajas'] ?? 0,
+                $totales['peso_vivos'] ?? 0,
+                $recepcion_id
+            ]);
+            
+            // Generar archivos
+            $stmt = $db->prepare("
+                SELECT r.*, p.nombre AS proveedor_nombre
+                FROM recepciones r
+                LEFT JOIN proveedores p ON r.proveedor_id = p.id
+                WHERE r.id = ?
+            ");
+            $stmt->execute([$recepcion_id]);
+            $recepcion = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            $stmt = $db->prepare("SELECT * FROM bovinos WHERE recepcion_id = ?");
+            $stmt->execute([$recepcion_id]);
+            $bovinos = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            $archivo = generarActaRecepcion($recepcion_id, $bovinos, [], $recepcion);
+            generarArchivoCSV($recepcion_id, $bovinos, $recepcion);
+            
+            header('Location: ' . BASE_URL . '/recepcion/detalle?id=' . $recepcion_id . '&archivo=' . urlencode($archivo['nombre']));
+            exit;
+        }
+        
+    } catch (Exception $e) {
+        $error = $e->getMessage();
+    }
+}
+
+$titulo = 'Registrar Bovinos';
+$modulo = 'recepcion';
+$accion = 'crear';
+require_once __DIR__ . '/../../includes/header.php';
+
+$db = Database::getInstance()->getConnection();
+
+$stmt = $db->prepare("
+    SELECT r.*, 
+           p.nombre AS proveedor_nombre,
+           u.nombre AS usuario_nombre,
+           u.apellido AS usuario_apellido
+    FROM recepciones r
+    LEFT JOIN proveedores p ON r.proveedor_id = p.id
+    LEFT JOIN usuarios u ON r.usuario_id = u.id
+    WHERE r.id = ?
+");
+$stmt->execute([$recepcion_id]);
+$recepcion = $stmt->fetch(PDO::FETCH_ASSOC);
+
+if (!$recepcion) {
+    header('Location: ' . BASE_URL . '/recepcion');
+    exit;
+}
+
+$stmt = $db->prepare("
+    SELECT b.*, c.nombre AS corral_nombre, c.tipo AS corral_tipo
+    FROM bovinos b
+    LEFT JOIN corrales c ON b.corral_id = c.id
+    WHERE b.recepcion_id = ? 
+    ORDER BY 
+        CASE b.estado 
+            WHEN 'muerto' THEN 1
+            WHEN 'devuelto' THEN 2
+            ELSE 0
+        END,
+        b.id
+");
+$stmt->execute([$recepcion_id]);
+$bovinos = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Totales
+$pesoTotal = 0;
+$valorTotal = 0;
+$enHospital = 0;
+$muertos = 0;
+$devueltos = 0;
+$vivos = 0;
+
+foreach ($bovinos as $b) {
+    if ($b['estado'] === 'muerto') {
+        $muertos++;
+        continue;
+    }
+    if ($b['estado'] === 'devuelto') {
+        $devueltos++;
+        continue;
+    }
+    $vivos++;
+    $pesoTotal += $b['peso_entrada'];
+    $cat = categorizarBovino($b['sexo'], $b['peso_entrada']);
+    $valorTotal += $cat['precio_total'];
+    if ($b['en_hospital']) $enHospital++;
+}
+?>
+
+<div class="table-container" style="margin-bottom: 25px;">
+    <div class="table-header">
+        <div>
+            <h2>Recepcion: <?= htmlspecialchars($recepcion['folio']) ?></h2>
+            <p style="color: #666; font-size: 0.9rem; margin-top: 5px;">
+                Proveedor: <strong><?= htmlspecialchars($recepcion['proveedor_nombre'] ?? 'N/A') ?></strong> |
+                Chofer: <strong><?= htmlspecialchars($recepcion['chofer'] ?? 'N/A') ?></strong> |
+                Placas: <strong><?= htmlspecialchars($recepcion['placas'] ?? 'N/A') ?></strong>
+            </p>
+        </div>
+        <a href="<?= BASE_URL ?>/recepcion/detalle?id=<?= $recepcion_id ?>" class="btn btn-secondary">Volver al detalle</a>
+    </div>
+</div>
+
+<?php if ($error): ?>
+    <div class="alert alert-error">ERROR: <?= htmlspecialchars($error) ?></div>
+<?php endif; ?>
+
+<?php if ($exito): ?>
+    <div class="alert alert-success"><?= htmlspecialchars($exito) ?></div>
+<?php endif; ?>
+
+<div class="stats-grid" style="margin-bottom: 25px;">
+    <div class="stat-card blue">
+        <div class="stat-label">Registrados</div>
+        <div class="stat-value"><?= count($bovinos) ?> / <?= $recepcion['cantidad_animales'] ?></div>
+    </div>
+    <div class="stat-card green">
+        <div class="stat-label">Vivos</div>
+        <div class="stat-value"><?= $vivos ?></div>
+    </div>
+    <div class="stat-card" style="border-left-color: #dc3545;">
+        <div class="stat-label">Muertos</div>
+        <div class="stat-value"><?= $muertos ?></div>
+    </div>
+    <div class="stat-card" style="border-left-color: #6c757d;">
+        <div class="stat-label">Devueltos</div>
+        <div class="stat-value"><?= $devueltos ?></div>
+    </div>
+    <div class="stat-card yellow">
+        <div class="stat-label">En hospital</div>
+        <div class="stat-value"><?= $enHospital ?></div>
+    </div>
+</div>
+
+<!-- Formulario agregar bovino -->
+<div class="table-container" style="margin-bottom: 25px;">
+    <div class="table-header">
+        <h2>Registrar Bovino</h2>
+    </div>
+    
+    <form method="POST" id="formBovino" style="padding: 25px;">
+        <input type="hidden" name="accion" value="agregar">
+        
+        <!-- Selector de estado -->
+        <div style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+            <label style="display: block; margin-bottom: 10px; font-weight: 600;">Estado del bovino:</label>
+            <div style="display: flex; gap: 20px;">
+                <label style="display: flex; align-items: center; cursor: pointer;">
+                    <input type="radio" name="estado_bovino" value="vivo" checked onchange="toggleEstado()" style="margin-right: 8px;">
+                    <span>Vivo (sano / enfermo)</span>
+                </label>
+                <label style="display: flex; align-items: center; cursor: pointer;">
+                    <input type="radio" name="estado_bovino" value="muerto" onchange="toggleEstado()" style="margin-right: 8px;">
+                    <span style="color: #dc3545;">Muerto</span>
+                </label>
+                <label style="display: flex; align-items: center; cursor: pointer;">
+                    <input type="radio" name="estado_bovino" value="devuelto" onchange="toggleEstado()" style="margin-right: 8px;">
+                    <span style="color: #6c757d;">Devuelto al proveedor</span>
+                </label>
+            </div>
+        </div>
+        
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px;">
+            <div>
+                <label style="display: block; margin-bottom: 5px; font-weight: 600; font-size: 0.85rem;">ID SINIIGA *</label>
+                <input type="text" name="id_siniiga" maxlength="12" pattern="\d{12}" 
+                       placeholder="123456789012" required
+                       oninput="this.value = this.value.replace(/\D/g, '')"
+                       style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+            </div>
+            
+            <div>
+                <label style="display: block; margin-bottom: 5px; font-weight: 600; font-size: 0.85rem;">Sexo *</label>
+                <select name="sexo" id="sexo" required onchange="actualizarCategoria()"
+                        style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+                    <option value="">-- Seleccionar --</option>
+                    <option value="M">Macho</option>
+                    <option value="H">Hembra</option>
+                </select>
+            </div>
+            
+            <div>
+                <label style="display: block; margin-bottom: 5px; font-weight: 600; font-size: 0.85rem;">Peso (kg) *</label>
+                <input type="number" name="peso_entrada" id="peso" step="0.1" min="1"
+                       placeholder="Ej: 250" required oninput="actualizarCategoria()"
+                       style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+            </div>
+            
+            <div>
+                <label style="display: block; margin-bottom: 5px; font-weight: 600; font-size: 0.85rem;">Raza</label>
+                <input type="text" name="raza" placeholder="Ej: Angus"
+                       style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+            </div>
+            
+            <div>
+                <label style="display: block; margin-bottom: 5px; font-weight: 600; font-size: 0.85rem;">Edad (meses)</label>
+                <input type="number" name="edad_meses" min="0" placeholder="Ej: 12"
+                       style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+            </div>
+            
+            <div>
+                <label style="display: block; margin-bottom: 5px; font-weight: 600; font-size: 0.85rem;">Color</label>
+                <input type="text" name="color" placeholder="Ej: Cafe"
+                       style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+            </div>
+        </div>
+        
+        <div style="margin-top: 15px;">
+            <label style="display: block; margin-bottom: 5px; font-weight: 600; font-size: 0.85rem;">Observaciones</label>
+            <textarea name="observaciones" rows="2" placeholder="Notas sobre este bovino..."
+                      style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;"></textarea>
+        </div>
+        
+        <!-- Campos para VIVO (enfermo) -->
+        <div id="vivoFields" style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #226633;">
+            <label style="display: flex; align-items: center; font-weight: 600; cursor: pointer;">
+                <input type="checkbox" name="es_enfermo" id="es_enfermo" value="1" 
+                       onchange="toggleHospital()" style="margin-right: 10px; transform: scale(1.3);">
+                Enviar directo a HOSPITAL (enfermo / herido)
+            </label>
+            
+            <div id="hospitalFields" style="display: none; margin-top: 15px;">
+                <label style="display: block; margin-bottom: 5px; font-weight: 600; font-size: 0.85rem;">Motivo *</label>
+                <select name="motivo_hospital" id="motivo_hospital"
+                        style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+                    <option value="">-- Seleccionar motivo --</option>
+                    <option value="Diarrea">Diarrea</option>
+                    <option value="Diarrea con sangre">Diarrea con sangre</option>
+                    <option value="Presencia de moco">Presencia de moco</option>
+                    <option value="Falta de alimentacion">Falta de alimentacion</option>
+                    <option value="Falta de consumo de agua">Falta de consumo de agua</option>
+                    <option value="Debilidad">Debilidad</option>
+                    <option value="Lesion/Herida">Lesion / Herida</option>
+                    <option value="Orina anormal">Orina anormal</option>
+                    <option value="Otro">Otro</option>
+                </select>
+            </div>
+        </div>
+        
+        <!-- Campos para BAJA (muerto / devuelto) -->
+        <div id="bajaFields" style="display: none; margin-top: 20px; padding: 15px; background: #f8d7da; border-radius: 8px; border-left: 4px solid #dc3545;">
+            <div>
+                <label style="display: block; margin-bottom: 5px; font-weight: 600; font-size: 0.85rem;">Motivo de la baja *</label>
+                <select name="motivo_baja" id="motivo_baja"
+                        style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+                    <option value="">-- Seleccionar motivo --</option>
+                    <option value="Muerte en traslado">Muerte en traslado</option>
+                    <option value="Enfermedad detectada al llegar">Enfermedad detectada al llegar</option>
+                    <option value="Rechazado por el veterinario">Rechazado por el veterinario</option>
+                    <option value="Heridas graves">Heridas graves</option>
+                    <option value="Peso fuera de rango">Peso fuera de rango</option>
+                    <option value="Documentacion incompleta">Documentacion incompleta</option>
+                    <option value="Otro">Otro</option>
+                </select>
+            </div>
+            
+            <div style="margin-top: 15px;">
+                <label style="display: block; margin-bottom: 5px; font-weight: 600; font-size: 0.85rem;">Observaciones de la baja</label>
+                <textarea name="observaciones_baja" rows="2" placeholder="Detalles especificos de esta baja..."
+                          style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;"></textarea>
+            </div>
+        </div>
+        
+        <div id="categoriaPreview" style="display: none; background: #d4edda; color: #155724; padding: 10px 15px; border-radius: 6px; margin-top: 15px; font-size: 0.9rem;"></div>
+        
+        <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end;">
+            <button type="reset" class="btn btn-secondary" onclick="document.getElementById('categoriaPreview').style.display='none'; toggleEstado()">Limpiar</button>
+            <button type="submit" class="btn btn-primary">Agregar Bovino</button>
+        </div>
+    </form>
+</div>
+
+<!-- Tabla de bovinos -->
+<?php if (count($bovinos) > 0): ?>
+<div class="table-container">
+    <div class="table-header">
+        <h2>Bovinos Registrados (<?= count($bovinos) ?>)</h2>
+    </div>
+    
+    <table>
+        <thead>
+            <tr>
+                <th>SINIIGA</th>
+                <th>Sexo</th>
+                <th>Peso</th>
+                <th>Categoria</th>
+                <th>Corral</th>
+                <th>Estado</th>
+                <th>Precio/kg</th>
+                <th>Motivo</th>
+            </tr>
+        </thead>
+        <tbody>
+            <?php foreach ($bovinos as $b): 
+                $cat = categorizarBovino($b['sexo'], $b['peso_entrada']);
+                $esBaja = in_array($b['estado'], ['muerto', 'devuelto']);
+                $rowStyle = $esBaja ? 'background: #f8d7da; color: #721c24;' : '';
+            ?>
+            <tr style="<?= $rowStyle ?>">
+                <td><strong><?= htmlspecialchars($b['id_siniiga']) ?></strong></td>
+                <td><?= $b['sexo'] === 'M' ? 'M' : 'H' ?></td>
+                <td><?= number_format($b['peso_entrada'], 1) ?> kg</td>
+                <td><?= htmlspecialchars($cat['subcategoria']) ?></td>
+                <td>
+                    <?php if ($b['estado'] === 'muerto'): ?>
+                        <span style="color: #dc3545; font-weight: 600;">-</span>
+                    <?php elseif ($b['estado'] === 'devuelto'): ?>
+                        <span style="color: #6c757d; font-weight: 600;">-</span>
+                    <?php elseif ($b['en_hospital']): ?>
+                        <span class="badge-rol badge-recepcionista">
+                            <?= htmlspecialchars($b['corral_nombre'] ?? 'HOSPITAL') ?>
+                        </span>
+                    <?php else: ?>
+                        <span class="badge-rol badge-admin">
+                            <?= htmlspecialchars($b['corral_nombre'] ?? 'Sin corral') ?>
+                        </span>
+                    <?php endif; ?>
+                </td>
+                <td>
+                    <?php if ($b['estado'] === 'muerto'): ?>
+                        <strong style="color: #dc3545;">MUERTO</strong>
+                    <?php elseif ($b['estado'] === 'devuelto'): ?>
+                        <strong style="color: #6c757d;">DEVUELTO</strong>
+                    <?php elseif ($b['en_hospital']): ?>
+                        <strong style="color: #dc3545;">Hospital</strong>
+                    <?php else: ?>
+                        <strong style="color: #28a745;">Sano</strong>
+                    <?php endif; ?>
+                </td>
+                <td>
+                    <?php if ($esBaja): ?>
+                        -
+                    <?php else: ?>
+                        $<?= number_format($cat['precio_kg'], 2) ?>
+                    <?php endif; ?>
+                </td>
+                <td style="font-size: 0.85rem;">
+                    <?php if ($esBaja): ?>
+                        <strong><?= htmlspecialchars($b['motivo_baja'] ?? '') ?></strong>
+                        <?php if (!empty($b['observaciones_baja'])): ?>
+                            <br><small><?= htmlspecialchars($b['observaciones_baja']) ?></small>
+                        <?php endif; ?>
+                    <?php elseif ($b['en_hospital']): ?>
+                        <?= htmlspecialchars($b['motivo_hospital'] ?? '') ?>
+                    <?php else: ?>
+                        -
+                    <?php endif; ?>
+                </td>
+            </tr>
+            <?php endforeach; ?>
+        </tbody>
+    </table>
+</div>
+
+<div style="margin-top: 25px; text-align: right;">
+    <form method="POST" style="display: inline;">
+        <input type="hidden" name="accion" value="finalizar">
+        <button type="submit" class="btn btn-primary" style="padding: 12px 30px; font-size: 1rem;">
+            Finalizar Recepcion y Generar Acta
+        </button>
+    </form>
+</div>
+<?php endif; ?>
+
+<script>
+function actualizarCategoria() {
+    const sexo = document.getElementById('sexo').value;
+    const peso = parseFloat(document.getElementById('peso').value);
+    const preview = document.getElementById('categoriaPreview');
+    const estadoBovino = document.querySelector('input[name="estado_bovino"]:checked').value;
+    
+    if (estadoBovino !== 'vivo' || !sexo || !peso || peso <= 0) {
+        preview.style.display = 'none';
+        return;
+    }
+    
+    const precios = {
+        'M': [
+            {min: 120, max: 170, precio: 92, cat: 'Becerro', corral: 'M-1'},
+            {min: 171, max: 200, precio: 90, cat: 'Becerro', corral: 'M-1'},
+            {min: 201, max: 230, precio: 86, cat: 'Ternero', corral: 'M-2'},
+            {min: 231, max: 250, precio: 83, cat: 'Ternero', corral: 'M-2'},
+            {min: 251, max: 300, precio: 78, cat: 'Novillo', corral: 'M-3'},
+            {min: 301, max: 350, precio: 0, cat: 'Adulto', corral: 'M-4'}
+        ],
+        'H': [
+            {min: 120, max: 200, precio: 84, cat: 'Becerro', corral: 'H-1'},
+            {min: 201, max: 230, precio: 81, cat: 'Ternero', corral: 'H-2'},
+            {min: 231, max: 250, precio: 78, cat: 'Novillo', corral: 'H-2'},
+            {min: 251, max: 300, precio: 78, cat: 'Novillo', corral: 'H-3'},
+            {min: 301, max: 350, precio: 0, cat: 'Adulto', corral: 'H-4'}
+        ]
+    };
+    
+    let encontrado = null;
+    for (const r of precios[sexo]) {
+        if (peso >= r.min && peso <= r.max) {
+            encontrado = r;
+            break;
+        }
+    }
+    
+    if (encontrado) {
+        const total = (encontrado.precio * peso).toFixed(2);
+        preview.innerHTML = 'Categoria: <strong>' + encontrado.cat + '</strong> | Corral sugerido: <strong>' + encontrado.corral + '</strong> | Precio/kg: <strong>$' + encontrado.precio + '</strong> | Valor: <strong>$' + Number(total).toLocaleString('es-MX', {minimumFractionDigits: 2}) + ' MXN</strong>';
+        preview.style.background = '#d4edda';
+        preview.style.color = '#155724';
+    } else {
+        preview.innerHTML = 'Peso fuera de rango (120-350 kg)';
+        preview.style.background = '#fff3cd';
+        preview.style.color = '#856404';
+    }
+    preview.style.display = 'block';
+}
+
+function toggleHospital() {
+    const checkbox = document.getElementById('es_enfermo');
+    const fields = document.getElementById('hospitalFields');
+    const motivo = document.getElementById('motivo_hospital');
+    
+    if (checkbox.checked) {
+        fields.style.display = 'block';
+        motivo.required = true;
+    } else {
+        fields.style.display = 'none';
+        motivo.required = false;
+        motivo.value = '';
+    }
+}
+
+function toggleEstado() {
+    const estadoBovino = document.querySelector('input[name="estado_bovino"]:checked').value;
+    const vivoFields = document.getElementById('vivoFields');
+    const bajaFields = document.getElementById('bajaFields');
+    const motivoBaja = document.getElementById('motivo_baja');
+    const preview = document.getElementById('categoriaPreview');
+    
+    if (estadoBovino === 'vivo') {
+        vivoFields.style.display = 'block';
+        bajaFields.style.display = 'none';
+        motivoBaja.required = false;
+        actualizarCategoria();
+    } else {
+        vivoFields.style.display = 'none';
+        bajaFields.style.display = 'block';
+        motivoBaja.required = true;
+        preview.style.display = 'none';
+    }
+}
+</script>
+
+<?php require_once __DIR__ . '/../../includes/footer.php'; ?>

@@ -1,0 +1,615 @@
+<?php
+// ============================================
+// MODULO VETERINARIO - Dar de alta a un bovino
+// El veterinario decide a que corral va
+// ============================================
+
+require_once __DIR__ . '/../../includes/config.php';
+require_once __DIR__ . '/../../includes/categorizacion.php';
+require_once __DIR__ . '/../../includes/asignacion_corrales.php';
+
+$bovino_id = (int)($_GET['id'] ?? 0);
+if (!$bovino_id) {
+    header('Location: ' . BASE_URL . '/sanidad');
+    exit;
+}
+
+if (!isset($_SESSION['user_id'])) {
+    header('Location: ' . BASE_URL . '/login');
+    exit;
+}
+
+$error = '';
+$exito = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    try {
+        $db = Database::getInstance()->getConnection();
+        
+        $corral_destino = (int)($_POST['corral_destino'] ?? 0);
+        $notas = trim($_POST['notas'] ?? '');
+        
+        if (!$corral_destino) {
+            throw new Exception('Debe seleccionar un corral de destino');
+        }
+        
+        // Verificar que el corral existe y tiene espacio
+        $stmt = $db->prepare("
+            SELECT * FROM corrales 
+            WHERE id = ? AND es_hospital = 0 AND es_venta = 0
+              AND ocupacion_actual < capacidad_maxima
+        ");
+        $stmt->execute([$corral_destino]);
+        $corral = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$corral) {
+            throw new Exception('El corral seleccionado no esta disponible');
+        }
+        
+        // Obtener datos del bovino
+        $stmt = $db->prepare("SELECT corral_id, corral_original_id FROM bovinos WHERE id = ?");
+        $stmt->execute([$bovino_id]);
+        $bovino = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        $hospital_actual = $bovino['corral_id'];
+        
+        // Actualizar bovino: sacar de hospital, asignar corral destino
+        $db->beginTransaction();
+        
+        $db->prepare("
+            UPDATE bovinos 
+            SET corral_id = ?,
+                en_hospital = 0,
+                motivo_hospital = NULL,
+                fecha_salida_hospital = NOW(),
+                estado = 'en_corral'
+            WHERE id = ?
+        ")->execute([$corral_destino, $bovino_id]);
+        
+        // Actualizar ocupacion del hospital (baja)
+        if ($hospital_actual) {
+            $db->prepare("UPDATE corrales SET ocupacion_actual = GREATEST(ocupacion_actual - 1, 0) WHERE id = ?")
+               ->execute([$hospital_actual]);
+        }
+        
+        // Actualizar ocupacion del corral destino (sube)
+        $db->prepare("UPDATE corrales SET ocupacion_actual = ocupacion_actual + 1 WHERE id = ?")
+           ->execute([$corral_destino]);
+        
+        // Registrar movimiento
+        $db->prepare("
+            INSERT INTO movimientos_bovino 
+            (bovino_id, corral_origen_id, corral_destino_id, tipo_movimiento, motivo, usuario_id, fecha)
+            VALUES (?, ?, ?, 'alta', ?, ?, NOW())
+        ")->execute([
+            $bovino_id, 
+            $hospital_actual, 
+            $corral_destino, 
+            $notas ?: 'Alta medica - recuperado',
+            $_SESSION['user_id']
+        ]);
+        
+        $db->commit();
+        
+        $exito = "Bovino dado de alta. Asignado a {$corral['nombre']}";
+        
+        header('refresh:2;url=' . BASE_URL . '/sanidad/historial?id=' . $bovino_id);
+        
+    } catch (Exception $e) {
+        if (isset($db) && $db->inTransaction()) {
+            $db->rollBack();
+        }
+        $error = $e->getMessage();
+    }
+}
+
+$titulo = 'Dar de Alta';
+$modulo = 'sanidad';
+$accion = 'editar';
+require_once __DIR__ . '/../../includes/header.php';
+
+$db = Database::getInstance()->getConnection();
+
+// Datos del bovino
+$stmt = $db->prepare("
+    SELECT b.*, 
+           c.nombre AS corral_actual_nombre,
+           r.folio AS folio_recepcion,
+           p.nombre AS proveedor_nombre
+    FROM bovinos b
+    LEFT JOIN corrales c ON b.corral_id = c.id
+    LEFT JOIN recepciones r ON b.recepcion_id = r.id
+    LEFT JOIN proveedores p ON r.proveedor_id = p.id
+    WHERE b.id = ?
+");
+$stmt->execute([$bovino_id]);
+$bovino = $stmt->fetch(PDO::FETCH_ASSOC);
+
+if (!$bovino) {
+    header('Location: ' . BASE_URL . '/sanidad');
+    exit;
+}
+
+if (!$bovino['en_hospital']) {
+    header('Location: ' . BASE_URL . '/sanidad/historial?id=' . $bovino_id);
+    exit;
+}
+
+$cat = categorizarBovino($bovino['sexo'], $bovino['peso_entrada']);
+
+// Corrales sugeridos: por sexo y rango de peso
+$stmt = $db->prepare("
+    SELECT * FROM corrales
+    WHERE es_hospital = 0 
+      AND es_venta = 0
+      AND estado != 'Mantenimiento'
+      AND ocupacion_actual < capacidad_maxima
+      AND (sexo_permitido = ? OR sexo_permitido = 'Mixto')
+      AND peso_min IS NOT NULL
+      AND peso_max IS NOT NULL
+      AND ? BETWEEN peso_min AND peso_max
+    ORDER BY ocupacion_actual ASC, id ASC
+");
+$stmt->execute([$bovino['sexo'], $bovino['peso_entrada']]);
+$corralesSugeridos = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Corrales originales (donde estaba antes)
+$corralOriginalId = $bovino['corral_original_id'];
+$corralOriginal = null;
+if ($corralOriginalId) {
+    $stmt = $db->prepare("SELECT * FROM corrales WHERE id = ?");
+    $stmt->execute([$corralOriginalId]);
+    $corralOriginal = $stmt->fetch(PDO::FETCH_ASSOC);
+}
+
+// Todos los corrales disponibles (por si el veterinario quiere elegir otro)
+$stmt = $db->query("
+    SELECT * FROM corrales
+    WHERE es_hospital = 0 
+      AND es_venta = 0
+      AND estado != 'Mantenimiento'
+      AND ocupacion_actual < capacidad_maxima
+    ORDER BY nombre
+");
+$todosCorrales = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Tratamientos aplicados (resumen)
+$stmt = $db->prepare("
+    SELECT COUNT(*) as total, MAX(fecha_aplicacion) as ultimo
+    FROM tratamientos WHERE bovino_id = ?
+");
+$stmt->execute([$bovino_id]);
+$resumenTratamientos = $stmt->fetch(PDO::FETCH_ASSOC);
+?>
+
+<div class="table-container" style="margin-bottom: 25px;">
+    <div class="table-header">
+        <div>
+            <h2>Dar de Alta: <?= htmlspecialchars($bovino['id_siniiga']) ?></h2>
+            <p style="color: #666; font-size: 0.9rem; margin-top: 5px;">
+                <?= $bovino['sexo'] === 'M' ? 'Macho' : 'Hembra' ?> |
+                <?= number_format($bovino['peso_entrada'], 1) ?> kg |
+                <?= htmlspecialchars($cat['subcategoria']) ?> |
+                <?= htmlspecialchars($bovino['raza'] ?? 'Sin raza') ?>
+            </p>
+        </div>
+        <a href="<?= BASE_URL ?>/sanidad/historial?id=<?= $bovino_id ?>" class="btn btn-secondary">Volver al historial</a>
+    </div>
+    
+    <div style="padding: 20px; display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px;">
+        <div style="padding: 12px; background: #f8d7da; border-radius: 6px;">
+            <div style="font-size: 0.75rem; color: #666; text-transform: uppercase; font-weight: 600;">Motivo hospital</div>
+            <div style="font-size: 1rem; margin-top: 4px; color: #721c24; font-weight: 600;">
+                <?= htmlspecialchars($bovino['motivo_hospital'] ?? 'N/A') ?>
+            </div>
+        </div>
+        <div style="padding: 12px; background: #f8f9fa; border-radius: 6px;">
+            <div style="font-size: 0.75rem; color: #666; text-transform: uppercase; font-weight: 600;">Fecha ingreso</div>
+            <div style="font-size: 1rem; margin-top: 4px;">
+                <?= $bovino['fecha_entrada_hospital'] ? date('d/m/Y H:i', strtotime($bovino['fecha_entrada_hospital'])) : 'N/A' ?>
+            </div>
+        </div>
+        <div style="padding: 12px; background: #f8f9fa; border-radius: 6px;">
+            <div style="font-size: 0.75rem; color: #666; text-transform: uppercase; font-weight: 600;">Tratamientos</div>
+            <div style="font-size: 1rem; margin-top: 4px;">
+                <?= $resumenTratamientos['total'] ?? 0 ?> aplicados
+            </div>
+        </div>
+        <?php if ($corralOriginal): ?>
+        <div style="padding: 12px; background: #d4edda; border-radius: 6px;">
+            <div style="font-size: 0.75rem; color: #155724; text-transform: uppercase; font-weight: 600;">Corral original</div>
+            <div style="font-size: 1rem; margin-top: 4px; color: #155724; font-weight: 600;">
+                <?= htmlspecialchars($corralOriginal['nombre']) ?>
+            </div>
+        </div>
+        <?php endif; ?>
+    </div>
+</div>
+
+<?php if ($error): ?>
+    <div class="alert alert-error">ERROR: <?= htmlspecialchars($error) ?></div>
+<?php endif; ?>
+
+<?php if ($exito): ?>
+    <div class="alert alert-success"><?= htmlspecialchars($exito) ?></div>
+<?php endif; ?>
+
+<!-- Formulario de alta -->
+<div class="table-container">
+    <div class="table-header">
+        <h2>Seleccionar Corral Destino</h2>
+    </div>
+    
+    <form method="POST" style="padding: 25px;">
+        
+        <?php if ($corralOriginal): ?>
+        <div style="margin-bottom: 25px; padding: 15px; background: #d4edda; border-radius: 8px; border-left: 4px solid #28a745;">
+            <label style="display: flex; align-items: center; font-weight: 600; cursor: pointer;">
+                <input type="radio" name="corral_destino" value="<?= $corralOriginal['id'] ?>" checked style="margin-right: 10px; transform: scale(1.3);">
+                Regresar al corral original: <strong><?= htmlspecialchars($corralOriginal['nombre']) ?></strong>
+                (<?= $corralOriginal['ocupacion_actual'] ?>/<?= $corralOriginal['capacidad_maxima'] ?> ocupado)
+            </label>
+        </div>
+        <?php endif; ?>
+        
+        <?php if (count($corralesSugeridos) > 0): ?>
+        <h3 style="margin-bottom: 15px; color: #226633;">Corrales sugeridos (<?= $bovino['sexo'] === 'M' ? 'Macho' : 'Hembra' ?> - <?= number_format($bovino['peso_entrada'], 0) ?> kg)</h3>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-bottom: 25px;">
+            <?php foreach ($corralesSugeridos as $c): ?>
+                <?php if ($corralOriginal && $c['id'] == $corralOriginal['id']) continue; ?>
+                <label style="padding: 12px; background: #f0f8f0; border-radius: 6px; border: 2px solid #e0e0e0; cursor: pointer;">
+                    <input type="radio" name="corral_destino" value="<?= $c['id'] ?>" style="margin-right: 8px;">
+                    <strong><?= htmlspecialchars($c['nombre']) ?></strong>
+                    <div style="font-size: 0.8rem; color: #666; margin-top: 4px;">
+                        <?= $c['ocupacion_actual'] ?>/<?= $c['capacidad_maxima'] ?> -
+                        <?= htmlspecialchars($c['tipo']) ?>
+                    </div>
+                </label>
+            <?php endforeach; ?>
+        </div>
+        <?php endif; ?>
+        
+        <h3 style="margin-bottom: 15px; color: #666;">O seleccionar otro corral</h3>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-bottom: 25px;">
+            <?php foreach ($todosCorrales as $c): ?>
+                <?php 
+                    if ($corralOriginal && $c['id'] == $corralOriginal['id']) continue;
+                    $esSugerido = false;
+                    foreach ($corralesSugeridos as $cs) {
+                        if ($cs['id'] == $c['id']) { $esSugerido = true; break; }
+                    }
+                    if ($esSugerido) continue;
+                ?>
+                <label style="padding: 12px; background: #f8f9fa; border-radius: 6px; border: 2px solid #e0e0e0; cursor: pointer;">
+                    <input type="radio" name="corral_destino" value="<?= $c['id'] ?>" style="margin-right: 8px;">
+                    <strong><?= htmlspecialchars($c['nombre']) ?></strong>
+                    <div style="font-size: 0.8rem; color: #666; margin-top: 4px;">
+                        <?= $c['ocupacion_actual'] ?>/<?= $c['capacidad_maxima'] ?> -
+                        <?= htmlspecialchars($c['tipo']) ?>
+                    </div>
+                </label>
+            <?php endforeach; ?>
+        </div>
+        
+        <div style="margin-bottom: 20px;">
+            <label style="display: block; margin-bottom: 5px; font-weight: 600; font-size: 0.85rem;">Notas del alta</label>
+            <textarea name="notas" rows="2" placeholder="Observaciones sobre la recuperacion..."
+                      style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;"></textarea>
+        </div>
+        
+        <div style="display: flex; gap: 10px; justify-content: flex-end;">
+            <a href="<?= BASE_URL ?>/sanidad/historial?id=<?= $bovino_id ?>" class="btn btn-secondary">Cancelar</a>
+            <button type="submit" class="btn" style="background: #28a745; color: white; padding: 12px 30px;">
+                Confirmar Alta
+            </button>
+        </div>
+    </form>
+</div>
+
+<?php require_once __DIR__ . '/../../includes/footer.php'; ?>
+<?php
+// ============================================
+// MODULO VETERINARIO - Dar de alta a un bovino
+// El veterinario decide a que corral va
+// ============================================
+
+require_once __DIR__ . '/../../includes/config.php';
+require_once __DIR__ . '/../../includes/categorizacion.php';
+require_once __DIR__ . '/../../includes/asignacion_corrales.php';
+
+$bovino_id = (int)($_GET['id'] ?? 0);
+if (!$bovino_id) {
+    header('Location: ' . BASE_URL . '/sanidad');
+    exit;
+}
+
+if (!isset($_SESSION['user_id'])) {
+    header('Location: ' . BASE_URL . '/login');
+    exit;
+}
+
+$error = '';
+
+// ============================================
+// PROCESAR POST ANTES DE CARGAR HEADER
+// ============================================
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    try {
+        $db = Database::getInstance()->getConnection();
+        
+        $corral_destino = (int)($_POST['corral_destino'] ?? 0);
+        $notas = trim($_POST['notas'] ?? '');
+        
+        if (!$corral_destino) {
+            throw new Exception('Debe seleccionar un corral de destino');
+        }
+        
+        // Verificar que el corral existe y tiene espacio
+        $stmt = $db->prepare("
+            SELECT * FROM corrales 
+            WHERE id = ? AND es_hospital = 0 AND es_venta = 0
+              AND ocupacion_actual < capacidad_maxima
+        ");
+        $stmt->execute([$corral_destino]);
+        $corral = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$corral) {
+            throw new Exception('El corral seleccionado no esta disponible');
+        }
+        
+        // Obtener datos del bovino
+        $stmt = $db->prepare("SELECT corral_id, corral_original_id FROM bovinos WHERE id = ?");
+        $stmt->execute([$bovino_id]);
+        $bovino = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        $hospital_actual = $bovino['corral_id'];
+        
+        // Actualizar todo
+        $db->beginTransaction();
+        
+        $db->prepare("
+            UPDATE bovinos 
+            SET corral_id = ?,
+                en_hospital = 0,
+                motivo_hospital = NULL,
+                fecha_salida_hospital = NOW(),
+                estado = 'en_corral'
+            WHERE id = ?
+        ")->execute([$corral_destino, $bovino_id]);
+        
+        if ($hospital_actual) {
+            $db->prepare("UPDATE corrales SET ocupacion_actual = GREATEST(ocupacion_actual - 1, 0) WHERE id = ?")
+               ->execute([$hospital_actual]);
+        }
+        
+        $db->prepare("UPDATE corrales SET ocupacion_actual = ocupacion_actual + 1 WHERE id = ?")
+           ->execute([$corral_destino]);
+        
+        $db->prepare("
+            INSERT INTO movimientos_bovino 
+            (bovino_id, corral_origen_id, corral_destino_id, tipo_movimiento, motivo, usuario_id, fecha)
+            VALUES (?, ?, ?, 'alta', ?, ?, NOW())
+        ")->execute([
+            $bovino_id, 
+            $hospital_actual, 
+            $corral_destino, 
+            $notas ?: 'Alta medica - recuperado',
+            $_SESSION['user_id']
+        ]);
+        
+        $db->commit();
+        
+        // Redirigir INMEDIATAMENTE al historial (sin refresh)
+        header('Location: ' . BASE_URL . '/sanidad/historial?id=' . $bovino_id . '&msg=alta_exitosa');
+        exit;
+        
+    } catch (Exception $e) {
+        if (isset($db) && $db->inTransaction()) {
+            $db->rollBack();
+        }
+        $error = $e->getMessage();
+    }
+}
+
+// ============================================
+// AHORA SI, CARGAR EL HEADER (envia HTML)
+// ============================================
+$titulo = 'Dar de Alta';
+$modulo = 'sanidad';
+$accion = 'editar';
+require_once __DIR__ . '/../../includes/header.php';
+
+$db = Database::getInstance()->getConnection();
+
+// Datos del bovino
+$stmt = $db->prepare("
+    SELECT b.*, 
+           c.nombre AS corral_actual_nombre,
+           r.folio AS folio_recepcion,
+           p.nombre AS proveedor_nombre
+    FROM bovinos b
+    LEFT JOIN corrales c ON b.corral_id = c.id
+    LEFT JOIN recepciones r ON b.recepcion_id = r.id
+    LEFT JOIN proveedores p ON r.proveedor_id = p.id
+    WHERE b.id = ?
+");
+$stmt->execute([$bovino_id]);
+$bovino = $stmt->fetch(PDO::FETCH_ASSOC);
+
+if (!$bovino) {
+    header('Location: ' . BASE_URL . '/sanidad');
+    exit;
+}
+
+if (!$bovino['en_hospital']) {
+    header('Location: ' . BASE_URL . '/sanidad/historial?id=' . $bovino_id);
+    exit;
+}
+
+$cat = categorizarBovino($bovino['sexo'], $bovino['peso_entrada']);
+
+// Corrales sugeridos
+$stmt = $db->prepare("
+    SELECT * FROM corrales
+    WHERE es_hospital = 0 
+      AND es_venta = 0
+      AND estado != 'Mantenimiento'
+      AND ocupacion_actual < capacidad_maxima
+      AND (sexo_permitido = ? OR sexo_permitido = 'Mixto')
+      AND peso_min IS NOT NULL
+      AND peso_max IS NOT NULL
+      AND ? BETWEEN peso_min AND peso_max
+    ORDER BY ocupacion_actual ASC, id ASC
+");
+$stmt->execute([$bovino['sexo'], $bovino['peso_entrada']]);
+$corralesSugeridos = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Corral original
+$corralOriginalId = $bovino['corral_original_id'];
+$corralOriginal = null;
+if ($corralOriginalId) {
+    $stmt = $db->prepare("SELECT * FROM corrales WHERE id = ?");
+    $stmt->execute([$corralOriginalId]);
+    $corralOriginal = $stmt->fetch(PDO::FETCH_ASSOC);
+}
+
+// Todos los corrales
+$stmt = $db->query("
+    SELECT * FROM corrales
+    WHERE es_hospital = 0 
+      AND es_venta = 0
+      AND estado != 'Mantenimiento'
+      AND ocupacion_actual < capacidad_maxima
+    ORDER BY nombre
+");
+$todosCorrales = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Resumen de tratamientos
+$stmt = $db->prepare("
+    SELECT COUNT(*) as total, MAX(fecha_aplicacion) as ultimo
+    FROM tratamientos WHERE bovino_id = ?
+");
+$stmt->execute([$bovino_id]);
+$resumenTratamientos = $stmt->fetch(PDO::FETCH_ASSOC);
+?>
+
+<div class="table-container" style="margin-bottom: 25px;">
+    <div class="table-header">
+        <div>
+            <h2>Dar de Alta: <?= htmlspecialchars($bovino['id_siniiga']) ?></h2>
+            <p style="color: #666; font-size: 0.9rem; margin-top: 5px;">
+                <?= $bovino['sexo'] === 'M' ? 'Macho' : 'Hembra' ?> |
+                <?= number_format($bovino['peso_entrada'], 1) ?> kg |
+                <?= htmlspecialchars($cat['subcategoria']) ?> |
+                <?= htmlspecialchars($bovino['raza'] ?? 'Sin raza') ?>
+            </p>
+        </div>
+        <a href="<?= BASE_URL ?>/sanidad/historial?id=<?= $bovino_id ?>" class="btn btn-secondary">Volver al historial</a>
+    </div>
+    
+    <div style="padding: 20px; display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px;">
+        <div style="padding: 12px; background: #f8d7da; border-radius: 6px;">
+            <div style="font-size: 0.75rem; color: #666; text-transform: uppercase; font-weight: 600;">Motivo hospital</div>
+            <div style="font-size: 1rem; margin-top: 4px; color: #721c24; font-weight: 600;">
+                <?= htmlspecialchars($bovino['motivo_hospital'] ?? 'N/A') ?>
+            </div>
+        </div>
+        <div style="padding: 12px; background: #f8f9fa; border-radius: 6px;">
+            <div style="font-size: 0.75rem; color: #666; text-transform: uppercase; font-weight: 600;">Fecha ingreso</div>
+            <div style="font-size: 1rem; margin-top: 4px;">
+                <?= $bovino['fecha_entrada_hospital'] ? date('d/m/Y H:i', strtotime($bovino['fecha_entrada_hospital'])) : 'N/A' ?>
+            </div>
+        </div>
+        <div style="padding: 12px; background: #f8f9fa; border-radius: 6px;">
+            <div style="font-size: 0.75rem; color: #666; text-transform: uppercase; font-weight: 600;">Tratamientos</div>
+            <div style="font-size: 1rem; margin-top: 4px;">
+                <?= $resumenTratamientos['total'] ?? 0 ?> aplicados
+            </div>
+        </div>
+        <?php if ($corralOriginal): ?>
+        <div style="padding: 12px; background: #d4edda; border-radius: 6px;">
+            <div style="font-size: 0.75rem; color: #155724; text-transform: uppercase; font-weight: 600;">Corral original</div>
+            <div style="font-size: 1rem; margin-top: 4px; color: #155724; font-weight: 600;">
+                <?= htmlspecialchars($corralOriginal['nombre']) ?>
+            </div>
+        </div>
+        <?php endif; ?>
+    </div>
+</div>
+
+<?php if ($error): ?>
+    <div class="alert alert-error">ERROR: <?= htmlspecialchars($error) ?></div>
+<?php endif; ?>
+
+<div class="table-container">
+    <div class="table-header">
+        <h2>Seleccionar Corral Destino</h2>
+    </div>
+    
+    <form method="POST" style="padding: 25px;">
+        
+        <?php if ($corralOriginal): ?>
+        <div style="margin-bottom: 25px; padding: 15px; background: #d4edda; border-radius: 8px; border-left: 4px solid #28a745;">
+            <label style="display: flex; align-items: center; font-weight: 600; cursor: pointer;">
+                <input type="radio" name="corral_destino" value="<?= $corralOriginal['id'] ?>" checked style="margin-right: 10px; transform: scale(1.3);">
+                Regresar al corral original: <strong><?= htmlspecialchars($corralOriginal['nombre']) ?></strong>
+                (<?= $corralOriginal['ocupacion_actual'] ?>/<?= $corralOriginal['capacidad_maxima'] ?> ocupado)
+            </label>
+        </div>
+        <?php endif; ?>
+        
+        <?php if (count($corralesSugeridos) > 0): ?>
+        <h3 style="margin-bottom: 15px; color: #226633;">Corrales sugeridos (<?= $bovino['sexo'] === 'M' ? 'Macho' : 'Hembra' ?> - <?= number_format($bovino['peso_entrada'], 0) ?> kg)</h3>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-bottom: 25px;">
+            <?php foreach ($corralesSugeridos as $c): ?>
+                <?php if ($corralOriginal && $c['id'] == $corralOriginal['id']) continue; ?>
+                <label style="padding: 12px; background: #f0f8f0; border-radius: 6px; border: 2px solid #e0e0e0; cursor: pointer;">
+                    <input type="radio" name="corral_destino" value="<?= $c['id'] ?>" style="margin-right: 8px;">
+                    <strong><?= htmlspecialchars($c['nombre']) ?></strong>
+                    <div style="font-size: 0.8rem; color: #666; margin-top: 4px;">
+                        <?= $c['ocupacion_actual'] ?>/<?= $c['capacidad_maxima'] ?> -
+                        <?= htmlspecialchars($c['tipo']) ?>
+                    </div>
+                </label>
+            <?php endforeach; ?>
+        </div>
+        <?php endif; ?>
+        
+        <h3 style="margin-bottom: 15px; color: #666;">O seleccionar otro corral</h3>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-bottom: 25px;">
+            <?php foreach ($todosCorrales as $c): ?>
+                <?php 
+                    if ($corralOriginal && $c['id'] == $corralOriginal['id']) continue;
+                    $esSugerido = false;
+                    foreach ($corralesSugeridos as $cs) {
+                        if ($cs['id'] == $c['id']) { $esSugerido = true; break; }
+                    }
+                    if ($esSugerido) continue;
+                ?>
+                <label style="padding: 12px; background: #f8f9fa; border-radius: 6px; border: 2px solid #e0e0e0; cursor: pointer;">
+                    <input type="radio" name="corral_destino" value="<?= $c['id'] ?>" style="margin-right: 8px;">
+                    <strong><?= htmlspecialchars($c['nombre']) ?></strong>
+                    <div style="font-size: 0.8rem; color: #666; margin-top: 4px;">
+                        <?= $c['ocupacion_actual'] ?>/<?= $c['capacidad_maxima'] ?> -
+                        <?= htmlspecialchars($c['tipo']) ?>
+                    </div>
+                </label>
+            <?php endforeach; ?>
+        </div>
+        
+        <div style="margin-bottom: 20px;">
+            <label style="display: block; margin-bottom: 5px; font-weight: 600; font-size: 0.85rem;">Notas del alta</label>
+            <textarea name="notas" rows="2" placeholder="Observaciones sobre la recuperacion..."
+                      style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;"></textarea>
+        </div>
+        
+        <div style="display: flex; gap: 10px; justify-content: flex-end;">
+            <a href="<?= BASE_URL ?>/sanidad/historial?id=<?= $bovino_id ?>" class="btn btn-secondary">Cancelar</a>
+            <button type="submit" class="btn" style="background: #28a745; color: white; padding: 12px 30px;">
+                Confirmar Alta
+            </button>
+        </div>
+    </form>
+</div>
+
+<?php require_once __DIR__ . '/../../includes/footer.php'; ?>

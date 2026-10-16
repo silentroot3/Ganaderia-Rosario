@@ -1,10 +1,28 @@
 RewriteEngine On
 RewriteBase /
 
-# Módulos - URLs limpias
+# ============================================
+# MÓDULOS - URLs LIMPIAS
+# ============================================
 RewriteRule ^dashboard/?$ modules/dashboard/index.php [L,QSA]
 RewriteRule ^recepcion/?$ modules/recepcion/index.php [L,QSA]
-RewriteRule ^sanidad/?$ modules/sanidad/index.php [L,QSA]
+RewriteRule ^recepcion/crear/?$ modules/recepcion/crear.php [L,QSA]
+RewriteRule ^recepcion/bovinos/?$ modules/recepcion/bovinos.php [L,QSA]
+RewriteRule ^recepcion/detalle/?$ modules/recepcion/detalle.php [L,QSA]
+RewriteRule ^recepcion/exportar/?$ modules/recepcion/exportar.php [L,QSA]
+RewriteRule ^bovinos/?$ modules/bovinos/index.php [L,QSA]
+
+# ============================================
+# MODULO VETERINARIO (sanidad)
+# ============================================
+RewriteRule ^sanidad/?$                 modules/sanidad/index.php [L,QSA]
+RewriteRule ^sanidad/atender/?$         modules/sanidad/atender.php [L,QSA]
+RewriteRule ^sanidad/alta/?$            modules/sanidad/alta.php [L,QSA]
+RewriteRule ^sanidad/historial/?$       modules/sanidad/historial.php [L,QSA]
+RewriteRule ^sanidad/tratamiento/?$     modules/sanidad/tratamiento.php [L,QSA]
+
+
+
 RewriteRule ^clasificacion/?$ modules/clasificacion/index.php [L,QSA]
 RewriteRule ^corrales/?$ modules/corrales/index.php [L,QSA]
 RewriteRule ^alimentacion/?$ modules/alimentacion/index.php [L,QSA]
@@ -17,14 +35,26 @@ RewriteRule ^trazabilidad/?$ modules/trazabilidad/index.php [L,QSA]
 RewriteRule ^alertas/?$ modules/alertas/index.php [L,QSA]
 RewriteRule ^usuarios/?$ modules/usuarios/index.php [L,QSA]
 RewriteRule ^configuracion/?$ modules/configuracion/index.php [L,QSA]
-RewriteRule ^bovinos/?$ modules/bovinos/index.php [L,QSA]
 
-# Errores
+# ============================================
+# ERRORES
+# ============================================
 RewriteRule ^403/?$ modules/errors/403.php [L,QSA]
 
-# Auth (ya existe)
+# ============================================
+# AUTH
+# ============================================
 RewriteRule ^login/?$ modules/auth/login.php [L,QSA]
 RewriteRule ^logout/?$ modules/auth/logout.php [L,QSA]
 
-# Módulo detalle/crear/editar (genérico)
-RewriteRule ^([a-z]+)/([a-z]+)/?$ modules/$1/$2.php [L,QSA]
+# ============================================
+# REDIRIGIR LA RAÍZ
+# ============================================
+RewriteRule ^$ index.php [L,QSA]
+
+# ============================================
+# FALLBACK (última regla)
+# ============================================
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*)$ index.php [L,QSA]

@@ -1,0 +1,231 @@
+<?php
+// ============================================
+// REGISTRAR BOVINOS EN UNA RECEPCIÓN
+// ============================================
+
+// ⚠️ Cargar config PRIMERO para tener BASE_URL, DB, etc.
+require_once __DIR__ . '/../../includes/config.php';
+require_once __DIR__ . '/../../includes/categorizacion.php';
+require_once __DIR__ . '/../../includes/generar_archivos.php';
+
+// Validar el ID
+$recepcion_id = (int)($_GET['id'] ?? 0);
+if (!$recepcion_id) {
+    header('Location: ' . BASE_URL . '/recepcion');
+    exit;
+}
+
+// Ahora sí, verificar sesión y permisos
+if (!isset($_SESSION['user_id'])) {
+    header('Location: ' . BASE_URL . '/login');
+    exit;
+}
+
+// Cargar el header (que ya tiene todo lo necesario)
+$titulo = 'Registrar Bovinos';
+$modulo = 'recepcion';
+$accion = 'crear';
+
+require_once __DIR__ . '/../../includes/header.php';
+
+$db = Database::getInstance()->getConnection();
+
+// ... resto del código
+// Obtener datos de la recepción
+$stmt = $db->prepare("
+    SELECT r.*, p.nombre AS proveedor_nombre
+    FROM recepciones r
+    LEFT JOIN proveedores p ON r.proveedor_id = p.id
+    WHERE r.id = ?
+");
+$stmt->execute([$recepcion_id]);
+$recepcion = $stmt->fetch(PDO::FETCH_ASSOC);
+
+if (!$recepcion) {
+    header('Location: ' . BASE_URL . '/recepcion');
+    exit;
+}
+
+// Bovinos
+$stmt = $db->prepare("SELECT * FROM bovinos WHERE recepcion_id = ? ORDER BY id");
+$stmt->execute([$recepcion_id]);
+$bovinos = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Totales
+$pesoTotal = 0;
+$valorTotal = 0;
+$machos = 0;
+$hembras = 0;
+foreach ($bovinos as $b) {
+    $pesoTotal += $b['peso_entrada'];
+    $cat = categorizarBovino($b['sexo'], $b['peso_entrada']);
+    $valorTotal += $cat['precio_total'];
+    if ($b['sexo'] === 'M') $machos++; else $hembras++;
+}
+
+$archivoGenerado = $_GET['archivo'] ?? null;
+?>
+
+<style>
+    .info-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
+        padding: 20px;
+    }
+    .info-item {
+        padding: 12px;
+        background: #f8f9fa;
+        border-radius: 6px;
+    }
+    .info-label {
+        font-size: 0.75rem;
+        color: #666;
+        text-transform: uppercase;
+        font-weight: 600;
+    }
+    .info-value {
+        font-size: 1rem;
+        color: #333;
+        margin-top: 4px;
+    }
+</style>
+
+<!-- Header -->
+<div class="table-container" style="margin-bottom: 25px;">
+    <div class="table-header">
+        <div>
+            <h2>📋 Recepción: <?= htmlspecialchars($recepcion['folio']) ?></h2>
+            <p style="color: #666; font-size: 0.9rem; margin-top: 5px;">
+                Registrada el <?= date('d/m/Y H:i', strtotime($recepcion['fecha_recepcion'])) ?>
+                por <?= htmlspecialchars($recepcion['usuario_nombre'] . ' ' . $recepcion['usuario_apellido']) ?>
+            </p>
+        </div>
+        <div>
+            <a href="<?= BASE_URL ?>/recepcion" class="btn btn-secondary">← Volver</a>
+            <?php if (Permisos::puedeCrear('recepcion')): ?>
+                <a href="<?= BASE_URL ?>/recepcion/bovinos?id=<?= $recepcion_id ?>" class="btn btn-primary">
+                    ➕ Agregar Bovinos
+                </a>
+            <?php endif; ?>
+        </div>
+    </div>
+    
+    <?php if ($archivoGenerado): ?>
+        <div class="alert alert-success" style="margin: 20px;">
+            ✅ Archivo <strong><?= htmlspecialchars($archivoGenerado) ?></strong> generado correctamente.
+            <a href="<?= BASE_URL ?>/uploads/archivos/<?= htmlspecialchars($archivoGenerado) ?>" 
+               download style="color: #155724; text-decoration: underline; margin-left: 10px;">
+                📥 Descargar
+            </a>
+        </div>
+    <?php endif; ?>
+    
+    <!-- Info de la recepción -->
+    <div class="info-grid">
+        <div class="info-item">
+            <div class="info-label">Proveedor</div>
+            <div class="info-value"><?= htmlspecialchars($recepcion['proveedor_nombre'] ?? 'N/A') ?></div>
+        </div>
+        <div class="info-item">
+            <div class="info-label">Transporte</div>
+            <div class="info-value"><?= htmlspecialchars($recepcion['transporte'] ?? 'N/A') ?></div>
+        </div>
+        <div class="info-item">
+            <div class="info-label">Placas</div>
+            <div class="info-value"><?= htmlspecialchars($recepcion['placas'] ?? 'N/A') ?></div>
+        </div>
+        <div class="info-item">
+            <div class="info-label">Chofer</div>
+            <div class="info-value"><?= htmlspecialchars($recepcion['chofer'] ?? 'N/A') ?></div>
+        </div>
+        <div class="info-item">
+            <div class="info-label">Cantidad esperada</div>
+            <div class="info-value"><?= $recepcion['cantidad_animales'] ?> animales</div>
+        </div>
+        <div class="info-item">
+            <div class="info-label">Estado</div>
+            <div class="info-value">
+                <span class="badge-rol badge-<?= $recepcion['estado'] === 'completado' ? 'admin' : 'clasificador' ?>">
+                    <?= htmlspecialchars($recepcion['estado']) ?>
+                </span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Resumen -->
+<div class="stats-grid" style="margin-bottom: 25px;">
+    <div class="stat-card blue">
+        <div class="stat-label">Total Bovinos</div>
+        <div class="stat-value"><?= count($bovinos) ?></div>
+        <div class="stat-desc"><?= $machos ?> machos / <?= $hembras ?> hembras</div>
+    </div>
+    <div class="stat-card green">
+        <div class="stat-label">Peso Total</div>
+        <div class="stat-value"><?= number_format($pesoTotal, 0) ?> kg</div>
+        <div class="stat-desc">Promedio: <?= count($bovinos) ? number_format($pesoTotal / count($bovinos), 1) : 0 ?> kg</div>
+    </div>
+    <div class="stat-card yellow">
+        <div class="stat-label">Valor Estimado</div>
+        <div class="stat-value">$<?= number_format($valorTotal, 0) ?></div>
+        <div class="stat-desc">Según precios BECEMAR</div>
+    </div>
+</div>
+
+<!-- Lista de bovinos -->
+<?php if (count($bovinos) > 0): ?>
+<div class="table-container">
+    <div class="table-header">
+        <h2>🐄 Bovinos Registrados</h2>
+        <a href="<?= BASE_URL ?>/recepcion/exportar?id=<?= $recepcion_id ?>" class="btn btn-primary btn-sm">
+            📥 Exportar TXT
+        </a>
+    </div>
+    
+    <table>
+        <thead>
+            <tr>
+                <th>SINIIGA</th>
+                <th>Sexo</th>
+                <th>Raza</th>
+                <th>Color</th>
+                <th>Edad</th>
+                <th>Peso</th>
+                <th>Categoría</th>
+                <th>Precio/kg</th>
+                <th>Valor est.</th>
+            </tr>
+        </thead>
+        <tbody>
+            <?php foreach ($bovinos as $b): 
+                $cat = categorizarBovino($b['sexo'], $b['peso_entrada']);
+            ?>
+            <tr>
+                <td><strong><?= htmlspecialchars($b['id_siniiga']) ?></strong></td>
+                <td><?= $b['sexo'] === 'M' ? '♂️ M' : '♀️ H' ?></td>
+                <td><?= htmlspecialchars($b['raza'] ?? 'N/A') ?></td>
+                <td><?= htmlspecialchars($b['color'] ?? 'N/A') ?></td>
+                <td><?= $b['edad_meses'] ? $b['edad_meses'] . ' meses' : 'N/A' ?></td>
+                <td><?= number_format($b['peso_entrada'], 1) ?> kg</td>
+                <td><?= htmlspecialchars($cat['subcategoria']) ?></td>
+                <td>$<?= number_format($cat['precio_kg'], 2) ?></td>
+                <td><strong>$<?= number_format($cat['precio_total'], 0) ?></strong></td>
+            </tr>
+            <?php endforeach; ?>
+        </tbody>
+    </table>
+</div>
+<?php else: ?>
+<div class="table-container">
+    <div style="padding: 60px 40px; text-align: center; color: #999;">
+        <div style="font-size: 4rem; margin-bottom: 15px;">📭</div>
+        <h3>No hay bovinos registrados en esta recepción</h3>
+        <a href="<?= BASE_URL ?>/recepcion/bovinos?id=<?= $recepcion_id ?>" class="btn btn-primary" style="margin-top: 20px;">
+            ➕ Registrar Bovinos
+        </a>
+    </div>
+</div>
+<?php endif; ?>
+
+<?php require_once __DIR__ . '/../../includes/footer.php'; ?>

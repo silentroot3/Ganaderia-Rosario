@@ -94,7 +94,7 @@ class Permisos {
         'dashboard'      => ['icono' => '📊', 'titulo' => 'Dashboard',      'url' => '/dashboard'],
         'recepcion'      => ['icono' => '🚚', 'titulo' => 'Recepción',       'url' => '/recepcion'],
         'bovinos'        => ['icono' => '🐄', 'titulo' => 'Bovinos',         'url' => '/bovinos'],
-        'sanidad'        => ['icono' => '🩺', 'titulo' => 'Sanidad',         'url' => '/sanidad'],
+		'sanidad'        => ['icono' => '🩺', 'titulo' => 'Veterinario',     'url' => '/sanidad'],
         'clasificacion'  => ['icono' => '⚖️', 'titulo' => 'Clasificación',   'url' => '/clasificacion'],
         'corrales'       => ['icono' => '🏠', 'titulo' => 'Corrales',        'url' => '/corrales'],
         'alimentacion'   => ['icono' => '🍽️', 'titulo' => 'Alimentación',    'url' => '/alimentacion'],
