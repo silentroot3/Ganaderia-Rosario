@@ -1,164 +1,80 @@
-/* Variables de color */
+/* Ganadería El Rosario · Inicio de sesión (sin librerias externas) */
 :root {
-    --primary-color: #2c6b3f;
-    --primary-hover: #1e4d2e;
-    --secondary-color: #f8f9fa;
-    --text-color: #333;
-    --shadow-color: rgba(44, 107, 63, 0.1);
+    --azul: #0b4f86; --azul-700: #083b65; --azul-50: #eef4fa; --azul-100: #dbe8f4;
+    --dorado: #bb8939; --texto: #1f2937; --tenue: #6b7280; --linea: #d1d5db; --rojo: #dc2626;
+    --fuente: "Inter", "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif;
 }
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+[hidden] { display: none !important; }
+body { font-family: var(--fuente); color: var(--texto); background: #fff; -webkit-font-smoothing: antialiased; }
 
-body {
-    background: linear-gradient(135deg, #f5f7fa 0%, #e8edf0 100%);
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+.login { display: grid; grid-template-columns: 1.1fr 1fr; min-height: 100vh; }
+
+/* Lado de la marca */
+.login-marca {
+    position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 28px;
+    padding: 48px; background: linear-gradient(160deg, #f8fafc 0%, #eef4fa 100%); overflow: hidden;
 }
+.login-marca::before, .login-marca::after { content: ''; position: absolute; border-radius: 50%; }
+.login-marca::before { width: 520px; height: 520px; border: 1px solid rgba(11, 79, 134, .08); top: -160px; right: -180px; }
+.login-marca::after { width: 380px; height: 380px; border: 1px solid rgba(187, 137, 57, .14); bottom: -140px; left: -120px; }
+.login-marca img { width: min(400px, 80%); height: auto; position: relative; animation: entrar .6s ease-out; }
+.login-marca p { position: relative; max-width: 340px; text-align: center; color: var(--tenue); font-size: .95rem; line-height: 1.6; }
 
-.card {
-    border-radius: 15px;
-    background: rgba(255, 255, 255, 0.95);
-    backdrop-filter: blur(10px);
-    box-shadow: 0 20px 60px var(--shadow-color);
-    border: none;
-    transition: transform 0.3s ease;
+/* Lado del formulario */
+.login-panel { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 24px 24px; }
+.login-caja { width: 100%; max-width: 380px; margin: auto 0; animation: entrar .45s ease-out; }
+.login-logo-movil { display: none; width: 220px; margin: 0 auto 28px; }
+.login-caja h1 { font-size: 1.65rem; font-weight: 650; letter-spacing: -.02em; }
+.login-sub { color: var(--tenue); margin: 4px 0 28px; }
+
+.aviso { padding: 11px 14px; border-radius: 8px; font-size: .88rem; margin-bottom: 18px; border: 1px solid; }
+.aviso-error { background: #fef2f2; border-color: #fecaca; color: #7f1d1d; }
+.aviso-ok { background: #ecfdf3; border-color: #bbf7d0; color: #14532d; }
+.aviso-info { background: var(--azul-50); border-color: var(--azul-100); color: #0c3a63; }
+
+.campo { display: block; margin-bottom: 16px; }
+.campo > span { display: block; font-size: .82rem; font-weight: 600; color: #374151; margin-bottom: 6px; }
+.entrada { position: relative; display: flex; align-items: center; }
+.entrada > svg { position: absolute; left: 13px; width: 18px; height: 18px; fill: none; stroke: #9ca3af; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; transition: stroke .15s; }
+.entrada input {
+    width: 100%; height: 46px; padding: 0 44px 0 42px; font: inherit; font-size: .95rem; color: var(--texto);
+    border: 1px solid var(--linea); border-radius: 9px; background: #fff; transition: border-color .15s, box-shadow .15s;
 }
+.entrada input::placeholder { color: #9ca3af; }
+.entrada input:hover { border-color: #b9bfc8; }
+.entrada input:focus { outline: none; border-color: var(--azul); box-shadow: 0 0 0 3px var(--azul-100); }
+.entrada:focus-within > svg { stroke: var(--azul); }
+.entrada input.error { border-color: var(--rojo); box-shadow: 0 0 0 3px #fee2e2; }
+.ver-clave { position: absolute; right: 6px; width: 34px; height: 34px; border: 0; background: none; border-radius: 7px; cursor: pointer; display: grid; place-items: center; }
+.ver-clave svg { width: 18px; height: 18px; fill: none; stroke: #9ca3af; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.ver-clave:hover { background: #f3f4f6; }
+.ver-clave.on svg { stroke: var(--azul); }
+.mayus { display: block; margin-top: 6px; color: #b45309; font-size: .8rem; }
 
-.card:hover {
-    transform: translateY(-5px);
+.recordar { display: flex; align-items: center; gap: 8px; font-size: .88rem; color: #4b5563; margin: 4px 0 22px; cursor: pointer; user-select: none; }
+.recordar input { width: 16px; height: 16px; accent-color: var(--azul); }
+
+.btn-entrar {
+    width: 100%; height: 46px; border: 0; border-radius: 9px; background: var(--azul); color: #fff;
+    font: inherit; font-size: .95rem; font-weight: 600; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center; gap: 9px;
+    transition: background .15s, transform .1s, box-shadow .15s;
 }
+.btn-entrar:hover { background: var(--azul-700); box-shadow: 0 6px 16px rgba(11, 79, 134, .25); }
+.btn-entrar:active { transform: scale(.99); }
+.btn-entrar:focus-visible { outline: 0; box-shadow: 0 0 0 3px var(--azul-100); }
+.btn-entrar:disabled { opacity: .85; cursor: wait; }
+.btn-entrar.cargando::before { content: ''; width: 15px; height: 15px; border: 2px solid #fff; border-right-color: transparent; border-radius: 50%; animation: girar .7s linear infinite; }
 
-.card-body {
-    padding: 2.5rem !important;
-}
+.login-pie { padding-top: 32px; font-size: .78rem; color: #9ca3af; }
 
-/* Logo */
-img {
-    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
-}
+@keyframes entrar { from { transform: translateY(8px); } to { transform: none; } }
+@keyframes girar { to { transform: rotate(360deg); } }
 
-/* Títulos */
-h4 {
-    color: var(--primary-color);
-    letter-spacing: 0.5px;
-}
-
-/* Campos de formulario */
-.form-control {
-    border-radius: 10px;
-    border: 2px solid #e9ecef;
-    padding: 12px 15px;
-    transition: all 0.3s ease;
-}
-
-.form-control:focus {
-    border-color: var(--primary-color);
-    box-shadow: 0 0 0 0.2rem rgba(44, 107, 63, 0.25);
-}
-
-.input-group-text {
-    border-radius: 10px 0 0 10px;
-    border: 2px solid #e9ecef;
-    border-right: none;
-    background-color: #f8f9fa;
-}
-
-.input-group .form-control {
-    border-radius: 0 10px 10px 0;
-    border-left: none;
-}
-
-/* Botón */
-.btn-primary {
-    background: linear-gradient(135deg, var(--primary-color), var(--primary-hover));
-    border: none;
-    border-radius: 10px;
-    padding: 12px;
-    font-weight: 600;
-    letter-spacing: 0.5px;
-    transition: all 0.3s ease;
-}
-
-.btn-primary:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 25px rgba(44, 107, 63, 0.3);
-}
-
-.btn-primary:active {
-    transform: translateY(0);
-}
-
-.btn-primary:disabled {
-    opacity: 0.7;
-    transform: none;
-}
-
-/* Checkbox personalizado */
-.form-check-input:checked {
-    background-color: var(--primary-color);
-    border-color: var(--primary-color);
-}
-
-/* Enlaces */
-a {
-    color: var(--primary-color);
-    transition: color 0.3s ease;
-}
-
-a:hover {
-    color: var(--primary-hover);
-}
-
-/* Alertas */
-.alert {
-    border-radius: 10px;
-    border: none;
-}
-
-.alert-dismissible .btn-close {
-    padding: 1.25rem;
-}
-
-/* Animaciones */
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-        transform: translateY(20px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-.card {
-    animation: fadeIn 0.5s ease-out;
-}
-
-/* Responsive */
-@media (max-width: 768px) {
-    .card-body {
-        padding: 1.5rem !important;
-    }
-    
-    .card {
-        margin: 1rem;
-    }
-}
-
-/* Estilos para el botón de mostrar contraseña */
-#togglePassword {
-    border-radius: 0 10px 10px 0;
-    border: 2px solid #e9ecef;
-    border-left: none;
-}
-
-#togglePassword:hover {
-    background-color: #f1f3f5;
-}
-
-/* Validación de errores */
-.form-control.is-invalid {
-    border-color: #dc3545;
-}
-
-.invalid-feedback {
-    display: block;
+@media (max-width: 860px) {
+    .login { grid-template-columns: 1fr; }
+    .login-marca { display: none; }
+    .login-logo-movil { display: block; }
+    .login-panel { background: linear-gradient(180deg, #f8fafc 0%, #fff 40%); }
 }

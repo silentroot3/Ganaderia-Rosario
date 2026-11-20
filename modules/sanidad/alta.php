@@ -30,6 +30,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $corral_destino = (int)($_POST['corral_destino'] ?? 0);
         $notas = trim($_POST['notas'] ?? '');
         
+        // Un bovino que llego enfermo y aun no se clasifica regresa a RECEP: lo clasifica el clasificador
+        $stmt = $db->prepare("
+            SELECT c.id FROM bovinos b
+            JOIN corrales c ON c.es_recepcion = 1 AND c.sexo_permitido = b.sexo
+            WHERE b.id = ? AND b.categoria = 'Sin clasificar' LIMIT 1
+        ");
+        $stmt->execute([$bovino_id]);
+        $corral_destino = (int)($stmt->fetchColumn() ?: $corral_destino);
+
         if (!$corral_destino) {
             throw new Exception('Debe seleccionar un corral de destino');
         }
@@ -60,9 +69,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 en_hospital = 0,
                 motivo_hospital = NULL,
                 fecha_salida_hospital = NOW(),
-                estado = 'en_corral'
+                estado = IF(?, 'recibido', 'en_corral')
             WHERE id = ?
-        ")->execute([$corral_destino, $bovino_id]);
+        ")->execute([$corral_destino, (int)$corral['es_recepcion'], $bovino_id]);
         
         if ($hospital_actual) {
             $db->prepare("UPDATE corrales SET ocupacion_actual = GREATEST(ocupacion_actual - 1, 0) WHERE id = ?")
@@ -178,7 +187,7 @@ $resumenTratamientos = $stmt->fetch(PDO::FETCH_ASSOC);
     <div class="table-header">
         <div>
             <h2>Dar de Alta: <?= htmlspecialchars($bovino['id_siniiga']) ?></h2>
-            <p style="color: #666; font-size: 0.9rem; margin-top: 5px;">
+            <p style="color: var(--tenue); font-size: 0.9rem; margin-top: 5px;">
                 <?= $bovino['sexo'] === 'M' ? 'Macho' : 'Hembra' ?> |
                 <?= number_format($bovino['peso_entrada'], 1) ?> kg |
                 <?= htmlspecialchars($cat['subcategoria']) ?> |
@@ -189,28 +198,28 @@ $resumenTratamientos = $stmt->fetch(PDO::FETCH_ASSOC);
     </div>
     
     <div style="padding: 20px; display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px;">
-        <div style="padding: 12px; background: #f8d7da; border-radius: 6px;">
-            <div style="font-size: 0.75rem; color: #666; text-transform: uppercase; font-weight: 600;">Motivo hospital</div>
-            <div style="font-size: 1rem; margin-top: 4px; color: #721c24; font-weight: 600;">
+        <div style="padding: 12px; background: var(--f-rojo); border-radius: 6px;">
+            <div style="font-size: 0.75rem; color: var(--tenue); text-transform: uppercase; font-weight: 600;">Motivo hospital</div>
+            <div style="font-size: 1rem; margin-top: 4px; color: var(--t-rojo); font-weight: 600;">
                 <?= htmlspecialchars($bovino['motivo_hospital'] ?? 'N/A') ?>
             </div>
         </div>
-        <div style="padding: 12px; background: #f8f9fa; border-radius: 6px;">
-            <div style="font-size: 0.75rem; color: #666; text-transform: uppercase; font-weight: 600;">Fecha ingreso</div>
+        <div style="padding: 12px; background: var(--suave); border-radius: 6px;">
+            <div style="font-size: 0.75rem; color: var(--tenue); text-transform: uppercase; font-weight: 600;">Fecha ingreso</div>
             <div style="font-size: 1rem; margin-top: 4px;">
                 <?= $bovino['fecha_entrada_hospital'] ? date('d/m/Y H:i', strtotime($bovino['fecha_entrada_hospital'])) : 'N/A' ?>
             </div>
         </div>
-        <div style="padding: 12px; background: #f8f9fa; border-radius: 6px;">
-            <div style="font-size: 0.75rem; color: #666; text-transform: uppercase; font-weight: 600;">Tratamientos</div>
+        <div style="padding: 12px; background: var(--suave); border-radius: 6px;">
+            <div style="font-size: 0.75rem; color: var(--tenue); text-transform: uppercase; font-weight: 600;">Tratamientos</div>
             <div style="font-size: 1rem; margin-top: 4px;">
                 <?= $resumenTratamientos['total'] ?? 0 ?> aplicados
             </div>
         </div>
         <?php if ($corralOriginal): ?>
-        <div style="padding: 12px; background: #d4edda; border-radius: 6px;">
-            <div style="font-size: 0.75rem; color: #155724; text-transform: uppercase; font-weight: 600;">Corral original</div>
-            <div style="font-size: 1rem; margin-top: 4px; color: #155724; font-weight: 600;">
+        <div style="padding: 12px; background: var(--f-verde); border-radius: 6px;">
+            <div style="font-size: 0.75rem; color: var(--t-verde); text-transform: uppercase; font-weight: 600;">Corral original</div>
+            <div style="font-size: 1rem; margin-top: 4px; color: var(--t-verde); font-weight: 600;">
                 <?= htmlspecialchars($corralOriginal['nombre']) ?>
             </div>
         </div>
@@ -230,7 +239,7 @@ $resumenTratamientos = $stmt->fetch(PDO::FETCH_ASSOC);
     <form method="POST" style="padding: 25px;">
         
         <?php if ($corralOriginal): ?>
-        <div style="margin-bottom: 25px; padding: 15px; background: #d4edda; border-radius: 8px; border-left: 4px solid #28a745;">
+        <div style="margin-bottom: 25px; padding: 15px; background: var(--f-verde); border-radius: 8px; border-left: 4px solid #28a745;">
             <label style="display: flex; align-items: center; font-weight: 600; cursor: pointer;">
                 <input type="radio" name="corral_destino" value="<?= $corralOriginal['id'] ?>" checked style="margin-right: 10px; transform: scale(1.3);">
                 Regresar al corral original: <strong><?= htmlspecialchars($corralOriginal['nombre']) ?></strong>
@@ -240,14 +249,14 @@ $resumenTratamientos = $stmt->fetch(PDO::FETCH_ASSOC);
         <?php endif; ?>
         
         <?php if (count($corralesSugeridos) > 0): ?>
-        <h3 style="margin-bottom: 15px; color: #226633;">Corrales sugeridos (<?= $bovino['sexo'] === 'M' ? 'Macho' : 'Hembra' ?> - <?= number_format($bovino['peso_entrada'], 0) ?> kg)</h3>
+        <h3 style="margin-bottom: 15px; color: #0b4f86;">Corrales sugeridos (<?= $bovino['sexo'] === 'M' ? 'Macho' : 'Hembra' ?> - <?= number_format($bovino['peso_entrada'], 0) ?> kg)</h3>
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-bottom: 25px;">
             <?php foreach ($corralesSugeridos as $c): ?>
                 <?php if ($corralOriginal && $c['id'] == $corralOriginal['id']) continue; ?>
-                <label style="padding: 12px; background: #f0f8f0; border-radius: 6px; border: 2px solid #e0e0e0; cursor: pointer;">
+                <label style="padding: 12px; background: var(--f-verde); border-radius: 6px; border: 2px solid var(--linea); cursor: pointer;">
                     <input type="radio" name="corral_destino" value="<?= $c['id'] ?>" style="margin-right: 8px;">
                     <strong><?= htmlspecialchars($c['nombre']) ?></strong>
-                    <div style="font-size: 0.8rem; color: #666; margin-top: 4px;">
+                    <div style="font-size: 0.8rem; color: var(--tenue); margin-top: 4px;">
                         <?= $c['ocupacion_actual'] ?>/<?= $c['capacidad_maxima'] ?> -
                         <?= htmlspecialchars($c['tipo']) ?>
                     </div>
@@ -256,7 +265,7 @@ $resumenTratamientos = $stmt->fetch(PDO::FETCH_ASSOC);
         </div>
         <?php endif; ?>
         
-        <h3 style="margin-bottom: 15px; color: #666;">O seleccionar otro corral</h3>
+        <h3 style="margin-bottom: 15px; color: var(--tenue);">O seleccionar otro corral</h3>
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-bottom: 25px;">
             <?php foreach ($todosCorrales as $c): ?>
                 <?php 
@@ -267,10 +276,10 @@ $resumenTratamientos = $stmt->fetch(PDO::FETCH_ASSOC);
                     }
                     if ($esSugerido) continue;
                 ?>
-                <label style="padding: 12px; background: #f8f9fa; border-radius: 6px; border: 2px solid #e0e0e0; cursor: pointer;">
+                <label style="padding: 12px; background: var(--suave); border-radius: 6px; border: 2px solid var(--linea); cursor: pointer;">
                     <input type="radio" name="corral_destino" value="<?= $c['id'] ?>" style="margin-right: 8px;">
                     <strong><?= htmlspecialchars($c['nombre']) ?></strong>
-                    <div style="font-size: 0.8rem; color: #666; margin-top: 4px;">
+                    <div style="font-size: 0.8rem; color: var(--tenue); margin-top: 4px;">
                         <?= $c['ocupacion_actual'] ?>/<?= $c['capacidad_maxima'] ?> -
                         <?= htmlspecialchars($c['tipo']) ?>
                     </div>
@@ -281,7 +290,7 @@ $resumenTratamientos = $stmt->fetch(PDO::FETCH_ASSOC);
         <div style="margin-bottom: 20px;">
             <label style="display: block; margin-bottom: 5px; font-weight: 600; font-size: 0.85rem;">Notas del alta</label>
             <textarea name="notas" rows="2" placeholder="Observaciones sobre la recuperacion..."
-                      style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;"></textarea>
+                      style="width: 100%; padding: 10px; border: 1px solid var(--linea); border-radius: 6px;"></textarea>
         </div>
         
         <div style="display: flex; gap: 10px; justify-content: flex-end;">

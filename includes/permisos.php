@@ -33,6 +33,9 @@ class Permisos {
             'reportes'       => ['ver', 'crear', 'editar', 'eliminar'],
             'trazabilidad'   => ['ver', 'crear', 'editar', 'eliminar'],
             'alertas'        => ['ver', 'crear', 'editar', 'eliminar'],
+            'solicitudes'    => ['ver', 'crear', 'editar', 'eliminar'],
+            'proveedores'    => ['ver', 'crear', 'editar', 'eliminar'],
+            'compras'        => ['ver', 'crear', 'editar', 'eliminar'],
             'usuarios'       => ['ver', 'crear', 'editar', 'eliminar'],
             'configuracion'  => ['ver', 'crear', 'editar', 'eliminar'],
         ],
@@ -45,6 +48,7 @@ class Permisos {
             'recepcion'      => ['ver', 'crear', 'editar'],
             'bovinos'        => ['ver', 'crear', 'editar'],
             'trazabilidad'   => ['ver'],
+            'proveedores'    => ['ver'],
             'alertas'        => ['ver'],
         ],
         
@@ -57,8 +61,11 @@ class Permisos {
             'bovinos'        => ['ver'],
             'sanidad'        => ['ver', 'crear', 'editar'],
             'tratamientos'   => ['ver', 'crear', 'editar'],
+            'alimentacion'   => ['ver'],          // define las dietas (alimentacion/dietas)
             'seguimiento'    => ['ver'],
             'trazabilidad'   => ['ver'],
+            'solicitudes'    => ['ver', 'crear'],
+            'proveedores'    => ['ver'],
             'alertas'        => ['ver'],
         ],
         
@@ -78,10 +85,23 @@ class Permisos {
         // ============================================
         // ALIMENTADOR: Solo alimentación
         // ============================================
+        // ============================================
+        // VENDEDOR: Ventas (solo ve precio minimo y recomendado;
+        // abajo del recomendado necesita descuento autorizado por el admin)
+        // ============================================
+        'vendedor' => [
+            'dashboard'      => ['ver'],
+            'ventas'         => ['ver', 'crear'],
+            'trazabilidad'   => ['ver'],
+            'alertas'        => ['ver'],
+        ],
+
         'alimentador' => [
             'dashboard'      => ['ver'],
             'corrales'       => ['ver'],
             'alimentacion'   => ['ver', 'crear', 'editar'],
+            'solicitudes'    => ['ver', 'crear'],
+            'proveedores'    => ['ver'],
             'alertas'        => ['ver'],
         ],
     ];
@@ -91,22 +111,24 @@ class Permisos {
      * (nombre => [icono, título, url, rol mínimo])
      */
     private static $modulos = [
-        'dashboard'      => ['icono' => '📊', 'titulo' => 'Dashboard',      'url' => '/dashboard'],
-        'recepcion'      => ['icono' => '🚚', 'titulo' => 'Recepción',       'url' => '/recepcion'],
-        'bovinos'        => ['icono' => '🐄', 'titulo' => 'Bovinos',         'url' => '/bovinos'],
-		'sanidad'        => ['icono' => '🩺', 'titulo' => 'Veterinario',     'url' => '/sanidad'],
-        'clasificacion'  => ['icono' => '⚖️', 'titulo' => 'Clasificación',   'url' => '/clasificacion'],
-        'corrales'       => ['icono' => '🏠', 'titulo' => 'Corrales',        'url' => '/corrales'],
-        'alimentacion'   => ['icono' => '🍽️', 'titulo' => 'Alimentación',    'url' => '/alimentacion'],
-        'tratamientos'   => ['icono' => '💊', 'titulo' => 'Tratamientos',    'url' => '/tratamientos'],
-        'seguimiento'    => ['icono' => '📈', 'titulo' => 'Seguimiento',     'url' => '/seguimiento'],
-        'costos'         => ['icono' => '💰', 'titulo' => 'Costos',          'url' => '/costos'],
-        'ventas'         => ['icono' => '🚛', 'titulo' => 'Ventas',          'url' => '/ventas'],
-        'reportes'       => ['icono' => '📋', 'titulo' => 'Reportes',        'url' => '/reportes'],
-        'trazabilidad'   => ['icono' => '🔍', 'titulo' => 'Trazabilidad',    'url' => '/trazabilidad'],
-        'alertas'        => ['icono' => '🔔', 'titulo' => 'Alertas',         'url' => '/alertas'],
-        'usuarios'       => ['icono' => '👥', 'titulo' => 'Usuarios',        'url' => '/usuarios'],
-        'configuracion'  => ['icono' => '⚙️', 'titulo' => 'Configuración',   'url' => '/configuracion'],
+        'dashboard'      => ['icono' => 'inicio',      'titulo' => 'Inicio',          'url' => '/dashboard',     'seccion' => ''],
+        'alertas'        => ['icono' => 'alerta',      'titulo' => 'Alertas',         'url' => '/alertas',       'seccion' => ''],
+        'recepcion'      => ['icono' => 'camion',      'titulo' => 'Recepción',       'url' => '/recepcion',     'seccion' => 'Ganado'],
+        'clasificacion'  => ['icono' => 'bascula',     'titulo' => 'Clasificación',   'url' => '/clasificacion', 'seccion' => 'Ganado'],
+        'corrales'       => ['icono' => 'corral',      'titulo' => 'Corrales',        'url' => '/corrales',      'seccion' => 'Ganado'],
+        'bovinos'        => ['icono' => 'arete',       'titulo' => 'Bovinos',         'url' => '/bovinos',       'seccion' => 'Ganado'],
+        'trazabilidad'   => ['icono' => 'buscar',      'titulo' => 'Trazabilidad',    'url' => '/trazabilidad',  'seccion' => 'Ganado'],
+        'seguimiento'    => ['icono' => 'grafica',     'titulo' => 'Seguimiento',     'url' => '/seguimiento',   'seccion' => 'Ganado'],
+        'sanidad'        => ['icono' => 'salud',       'titulo' => 'Veterinario',     'url' => '/sanidad',       'seccion' => 'Salud y alimento'],
+        'tratamientos'   => ['icono' => 'medicina',    'titulo' => 'Tratamientos',    'url' => '/tratamientos',  'seccion' => 'Salud y alimento'],
+        'alimentacion'   => ['icono' => 'alimento',    'titulo' => 'Alimentación',    'url' => '/alimentacion',  'seccion' => 'Salud y alimento'],
+        'ventas'         => ['icono' => 'venta',       'titulo' => 'Ventas',          'url' => '/ventas',        'seccion' => 'Negocio'],
+        'costos'         => ['icono' => 'dinero',      'titulo' => 'Costos',          'url' => '/costos',        'seccion' => 'Negocio'],
+        'reportes'       => ['icono' => 'reporte',     'titulo' => 'Reportes',        'url' => '/reportes',      'seccion' => 'Negocio'],
+        'compras'        => ['icono' => 'carrito',     'titulo' => 'Compras',         'url' => '/compras',       'seccion' => 'Negocio', 'alias' => ['/configuracion/compras']],
+        'proveedores'    => ['icono' => 'proveedor',   'titulo' => 'Proveedores',     'url' => '/proveedores',   'seccion' => 'Negocio'],
+        'solicitudes'    => ['icono' => 'solicitud',   'titulo' => 'Solicitudes',     'url' => '/solicitudes',   'seccion' => 'Negocio'],
+        'usuarios'       => ['icono' => 'usuarios',    'titulo' => 'Usuarios',        'url' => '/usuarios',      'seccion' => 'Administración'],
     ];
     
     /**

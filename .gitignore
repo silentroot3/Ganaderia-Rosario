@@ -1,96 +1,32 @@
-# Archivos generados (LaTeX, Python, etc.)
-*.aux
-*.log
-*.out
-*.toc
-*.synctex.gz
-*.fls
-*.fdb_latexmk
+# Configuracion real (contrasenas): usar includes/config.example.php como plantilla
+includes/config.php
+includes/test_login.php
 
-# Documentos PDF (opcional, descomentar si quieres ignorarlos)
-# documentacion/*.pdf
-# tareas/*.pdf
-
-# Backups
-backup.zip
-*.tar.gz
-*.bak
-
-# Configuración local
-.env
-.env.local
-*.local
-
-# Sistema
-.DS_Store
-Thumbs.db
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# Composer
-/vendor/
-
-# Node
-node_modules/
-
-# Uploads (opcional)
-# uploads/*
-
-# ============================================
-# BACKUPS Y TEMPORALES
-# ============================================
-*.bak
-*.bak2
+# Respaldos y copias de seguridad
+*.bak*
 *.bak_*
-*.backup
-backup.zip
-*.tar.gz
-*.zip
-*.log
-*.tmp
+*.bak.*
+*.old
 *~
 
-# ============================================
-# ARCHIVOS GENERADOS (NO versionar)
-# ============================================
-uploads/archivos/*.txt
-uploads/archivos/*.csv
-uploads/recepciones/*
-uploads/heridas/*
-uploads/documentos/*
-!uploads/archivos/.gitkeep
-!uploads/recepciones/.gitkeep
-!uploads/heridas/.gitkeep
-!uploads/documentos/.gitkeep
+# Respaldos de base de datos con datos reales
+database/backup_*.sql
+database/rebuild_completo.sql
+*.dump
 
-# ============================================
-# CONFIGURACION LOCAL
-# ============================================
-.env
-.env.local
-*.local
+# Volcados de codigo y archivos generados
+codigo_completo_proyecto.txt
+uploads/**
+!uploads/**/
+!uploads/**/.gitkeep
 
-# ============================================
-# SISTEMA
-# ============================================
+# Imagen original pesada del logo (en el sitio se usan las versiones de assets/img)
+/logo.jpeg
+
+# Sistema / editor
 .DS_Store
 Thumbs.db
-
-# ============================================
-# IDE
-# ============================================
 .vscode/
 .idea/
-*.swp
-*.swo
-
-# ============================================
-# NODE
-# ============================================
-node_modules/
-vendor/
+*.log
+_tmpshots_*/

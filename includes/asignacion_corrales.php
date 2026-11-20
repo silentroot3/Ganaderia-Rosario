@@ -211,3 +211,58 @@ function obtenerCorralesDisponibles($sexo = null, $peso = null) {
     $stmt->execute($params);
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
+
+/**
+ * Mueve un bovino a otro corral dentro de una transaccion ya abierta:
+ * ajusta la ocupacion de ambos corrales y deja el movimiento en el historial.
+ * corral_original_id queda en el destino (a donde regresa si luego va al hospital),
+ * salvo que $actualizarOriginal sea false (animales en hospital conservan su corral de regreso).
+ */
+function moverBovinoACorral($db, $bovino_id, $destino_id, $usuario_id, $tipo, $motivo, $actualizarOriginal = true) {
+    $stmt = $db->prepare("SELECT corral_id FROM bovinos WHERE id = ?");
+    $stmt->execute([$bovino_id]);
+    $origen_id = $stmt->fetchColumn() ?: null;
+    if ((int)$origen_id === (int)$destino_id) return false;
+
+    $db->prepare("UPDATE bovinos SET corral_id = ?, corral_original_id = IF(?, ?, corral_original_id) WHERE id = ?")
+       ->execute([$destino_id, $actualizarOriginal ? 1 : 0, $destino_id, $bovino_id]);
+    $db->prepare("UPDATE corrales SET ocupacion_actual = ocupacion_actual + 1 WHERE id = ?")->execute([$destino_id]);
+    if ($origen_id) {
+        $db->prepare("UPDATE corrales SET ocupacion_actual = GREATEST(ocupacion_actual - 1, 0) WHERE id = ?")->execute([$origen_id]);
+    }
+    $db->prepare("
+        INSERT INTO movimientos_bovino (bovino_id, corral_origen_id, corral_destino_id, tipo_movimiento, motivo, usuario_id, fecha)
+        VALUES (?, ?, ?, ?, ?, ?, NOW())
+    ")->execute([$bovino_id, $origen_id, $destino_id, $tipo, $motivo, $usuario_id]);
+    return true;
+}
+
+/** Categorias que puede elegir el clasificador segun el sexo (M / H) */
+function categoriasPorSexo($sexo) {
+    return $sexo === 'M'
+        ? ['Becerro' => 'Menos de 12 meses', 'Torete' => '12 a 24 meses, entero', 'Novillo' => 'Castrado', 'Toro' => 'Mas de 24 meses, entero']
+        : ['Becerra' => 'Menos de 12 meses', 'Vaquilla' => '12 a 30 meses, sin parto', 'Vaca' => 'Adulta / con parto'];
+}
+
+/** Fragmento SQL: peso actual del bovino (ultimo pesaje o, si no hay, el de entrada) */
+function sqlPesoActual($alias = 'b') {
+    return "COALESCE((SELECT pz.peso FROM pesajes pz WHERE pz.bovino_id = {$alias}.id ORDER BY pz.fecha DESC, pz.id DESC LIMIT 1), {$alias}.peso_entrada)";
+}
+
+/** Registra un pesaje con su ganancia diaria (gdp) respecto al pesaje anterior o al peso de entrada */
+function registrarPesaje($db, $bovino_id, $peso, $usuario_id, $observaciones = null) {
+    $stmt = $db->prepare("
+        SELECT peso, fecha FROM pesajes WHERE bovino_id = ? ORDER BY fecha DESC, id DESC LIMIT 1
+    ");
+    $stmt->execute([$bovino_id]);
+    $ant = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$ant) {
+        $stmt = $db->prepare("SELECT peso_entrada AS peso, DATE(created_at) AS fecha FROM bovinos WHERE id = ?");
+        $stmt->execute([$bovino_id]);
+        $ant = $stmt->fetch(PDO::FETCH_ASSOC);
+    }
+    $dias = $ant && $ant['fecha'] ? (strtotime(date('Y-m-d')) - strtotime($ant['fecha'])) / 86400 : 0;
+    $gdp = $dias > 0 && $ant['peso'] ? round(($peso - $ant['peso']) / $dias, 3) : null;
+    $db->prepare("INSERT INTO pesajes (bovino_id, peso, fecha, hora, gdp, usuario_id, observaciones) VALUES (?, ?, CURDATE(), CURTIME(), ?, ?, ?)")
+       ->execute([$bovino_id, $peso, $gdp, $usuario_id, $observaciones]);
+}

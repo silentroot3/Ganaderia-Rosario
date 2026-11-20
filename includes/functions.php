@@ -141,7 +141,10 @@ function verificarSesionActiva($usuario_id, $token) {
              AND fecha_ultima_actividad > DATE_SUB(NOW(), INTERVAL ? SECOND)",
             [$usuario_id, $token, SESSION_TIMEOUT]
         );
-        return $result !== false;
+        if ($result === false) return false;
+        // Mantener viva la sesion mientras el usuario trabaja (si no, expiraba 1 hora despues del login)
+        $db->execute("UPDATE sesiones SET fecha_ultima_actividad = NOW() WHERE id = ?", [$result['id']]);
+        return true;
     } catch(Exception $e) {
         return false;
     }
@@ -195,4 +198,14 @@ function mostrarFlashMessage() {
     }
     return '';
 }
+
+/**
+ * Verifica si el usuario actual puede ver precios/montos
+ * Solo admin puede ver informacion monetaria
+ */
+
+function puedeVerPrecios() {
+    return isset($_SESSION['rol']) && $_SESSION['rol'] === 'admin';
+}
+
 ?>

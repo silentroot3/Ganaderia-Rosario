@@ -74,159 +74,86 @@ $page_title = 'Iniciar Sesión';
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?= APP_NAME ?> - Iniciar Sesión</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/login.css">
+    <meta name="theme-color" content="#0b4f86">
+    <title>Iniciar sesión · Ganadería El Rosario</title>
+    <link rel="icon" type="image/png" href="<?= BASE_URL ?>/assets/img/favicon.png">
+    <link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/login.css?v=<?= @filemtime(BASE_PATH . '/assets/css/login.css') ?>">
 </head>
 <body>
-    <div class="container">
-        <div class="row justify-content-center align-items-center min-vh-100">
-            <div class="col-md-6 col-lg-5 col-xl-4">
-                <div class="card shadow-lg border-0">
-                    <div class="card-body p-5">
-                        <!-- Logo -->
-                       <!-- <div class="text-center mb-4">
-                            <img src=" <?= BASE_URL ?>    /assets/img/logo.png" alt="Logo" class="img-fluid" style="max-height: 80px;">
-                            <h4 class="mt-3 fw-bold"><?= APP_NAME ?></h4>
-                        </div> -->
-                        
-                        <!-- Mensajes flash -->
-                        <?php if (isset($_GET['timeout'])): ?>
-                            <div class="alert alert-warning alert-dismissible fade show">
-                                <i class="fas fa-clock me-2"></i> Su sesión ha expirado. Por favor, inicie sesión nuevamente.
-                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                            </div>
-                        <?php endif; ?>
-                        
-                        <?php if (isset($_GET['registered'])): ?>
-                            <div class="alert alert-success alert-dismissible fade show">
-                                <i class="fas fa-check-circle me-2"></i> ¡Registro exitoso! Ya puede iniciar sesión.
-                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                            </div>
-                        <?php endif; ?>
-                        
-                        <!-- Error -->
-                        <?php if ($error): ?>
-                            <div class="alert alert-danger alert-dismissible fade show">
-                                <i class="fas fa-exclamation-circle me-2"></i> <?= $error ?>
-                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                            </div>
-                        <?php endif; ?>
-                        
-                        <!-- Formulario de Login -->
-                        <form method="POST" action="" id="loginForm">
-                            <input type="hidden" name="csrf_token" value="<?= $csrf_token ?>">
-                            
-                            <div class="mb-3">
-                                <label for="email" class="form-label fw-semibold">
-                                    <i class="fas fa-envelope me-1"></i> Email
-                                </label>
-                                <div class="input-group">
-                                    <span class="input-group-text bg-light">
-                                        <i class="fas fa-envelope text-muted"></i>
-                                    </span>
-                                    <input type="email" 
-                                           class="form-control form-control-lg" 
-                                           id="email" 
-                                           name="email" 
-                                           value="<?= htmlspecialchars($email) ?>"
-                                           placeholder="usuario@ejemplo.com" 
-                                           required 
-                                           autofocus>
-                                </div>
-                            </div>
-                            
-                            <div class="mb-3">
-                                <label for="password" class="form-label fw-semibold">
-                                    <i class="fas fa-lock me-1"></i> Contraseña
-                                </label>
-                                <div class="input-group">
-                                    <span class="input-group-text bg-light">
-                                        <i class="fas fa-lock text-muted"></i>
-                                    </span>
-                                    <input type="password" 
-                                           class="form-control form-control-lg" 
-                                           id="password" 
-                                           name="password" 
-                                           placeholder="Ingrese su contraseña" 
-                                           required>
-                                    <button class="btn btn-outline-secondary" 
-                                            type="button" 
-                                           id="togglePassword">
-                                        <i class="fas fa-eye"></i>
-                                    </button>
-                                </div>
-                                <div class="form-text">
-                                    <a href="<?= BASE_URL ?>/recover" class="text-decoration-none small">
-                                        
-                                    </a>
-                                </div>
-                            </div>
-                            
-                            <div class="mb-4 form-check">
-                                <input type="checkbox" class="form-check-input" id="remember" name="remember">
-                                <label class="form-check-label" for="remember">
-                                    Recordarme
-                                </label>
-                            </div>
-                            
-                            <button type="submit" class="btn btn-primary btn-lg w-100" id="btnLogin">
-                                <i class="fas fa-sign-in-alt me-2"></i> Iniciar Sesión
-                            </button>
-                        </form>
-                        
-                        <hr class="my-4">
-                        
-                        <div class="text-center">
-                            <p class="text-muted small mb-0">
-                                
-                                <a href="<?= BASE_URL ?>/register" class="text-decoration-none fw-bold">
-                                    
-                                </a>
-                            </p>
+    <main class="login">
+        <section class="login-marca" aria-hidden="true">
+            <img src="<?= BASE_URL ?>/assets/img/logo.png?v=<?= @filemtime(BASE_PATH . '/assets/img/logo.png') ?>" alt="">
+            <p>Control de ganado, alimento, salud y ventas en un solo lugar.</p>
+        </section>
+
+        <section class="login-panel">
+            <div class="login-caja">
+                <img class="login-logo-movil" src="<?= BASE_URL ?>/assets/img/logo-horizontal.png" alt="Ganadería El Rosario">
+                <h1>Bienvenido</h1>
+                <p class="login-sub">Inicia sesión para continuar</p>
+
+                <?php if (isset($_GET['timeout'])): ?>
+                    <div class="aviso aviso-info">Tu sesión expiró. Vuelve a iniciar sesión.</div>
+                <?php endif; ?>
+                <?php if (isset($_GET['registered'])): ?>
+                    <div class="aviso aviso-ok">Registro exitoso. Ya puedes iniciar sesión.</div>
+                <?php endif; ?>
+                <?php if ($error): ?>
+                    <div class="aviso aviso-error" role="alert"><?= htmlspecialchars($error) ?></div>
+                <?php endif; ?>
+
+                <form method="POST" action="" id="loginForm" novalidate>
+                    <input type="hidden" name="csrf_token" value="<?= $csrf_token ?>">
+
+                    <label class="campo" for="email">
+                        <span>Correo</span>
+                        <div class="entrada">
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg>
+                            <input type="email" id="email" name="email" value="<?= htmlspecialchars($email) ?>"
+                                   placeholder="usuario@ganaderia.com" autocomplete="username" required <?= $email ? '' : 'autofocus' ?>>
                         </div>
-                    </div>
-                </div>
-            
+                    </label>
+
+                    <label class="campo" for="password">
+                        <span>Contraseña</span>
+                        <div class="entrada">
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+                            <input type="password" id="password" name="password" placeholder="Tu contraseña" autocomplete="current-password" required <?= $email ? 'autofocus' : '' ?>>
+                            <button type="button" class="ver-clave" id="togglePassword" aria-label="Mostrar contraseña" title="Mostrar contraseña">
+                                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+                            </button>
+                        </div>
+                        <small class="mayus" id="avisoMayus" hidden>Bloq Mayús está activado</small>
+                    </label>
+
+                    <label class="recordar"><input type="checkbox" name="remember"> Mantener la sesión iniciada</label>
+
+                    <button type="submit" class="btn-entrar" id="btnLogin">Iniciar sesión</button>
+                </form>
             </div>
-        </div>
-    </div>
-    
-    <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+            <footer class="login-pie">© <?= date('Y') ?> Ganadería El Rosario</footer>
+        </section>
+    </main>
+
     <script>
-        $(document).ready(function() {
-            // Mostrar/ocultar contraseña
-            $('#togglePassword').click(function() {
-                const passwordInput = $('#password');
-                const icon = $(this).find('i');
-                
-                if (passwordInput.attr('type') === 'password') {
-                    passwordInput.attr('type', 'text');
-                    icon.removeClass('fa-eye').addClass('fa-eye-slash');
-                } else {
-                    passwordInput.attr('type', 'password');
-                    icon.removeClass('fa-eye-slash').addClass('fa-eye');
-                }
-            });
-            
-            // Validación del formulario
-            $('#loginForm').on('submit', function(e) {
-                const email = $('#email').val().trim();
-                const password = $('#password').val().trim();
-                
-                if (!email || !password) {
-                    e.preventDefault();
-                    alert('Por favor, complete todos los campos.');
-                    return false;
-                }
-                
-                // Deshabilitar botón para evitar doble envío
-                $('#btnLogin').prop('disabled', true)
-                              .html('<span class="spinner-border spinner-border-sm me-2"></span> Iniciando sesión...');
-            });
+    (function () {
+        var f = document.getElementById('loginForm'), clave = document.getElementById('password'),
+            email = document.getElementById('email'), btn = document.getElementById('btnLogin'), mayus = document.getElementById('avisoMayus');
+        document.getElementById('togglePassword').addEventListener('click', function () {
+            var ver = clave.type === 'password';
+            clave.type = ver ? 'text' : 'password';
+            this.classList.toggle('on', ver);
+            this.setAttribute('aria-label', ver ? 'Ocultar contraseña' : 'Mostrar contraseña');
+            clave.focus();
         });
+        clave.addEventListener('keyup', function (e) { mayus.hidden = !(e.getModifierState && e.getModifierState('CapsLock')); });
+        f.addEventListener('submit', function (e) {
+            var mal = null;
+            [email, clave].forEach(function (i) { i.classList.remove('error'); if (!i.value.trim() || !i.checkValidity()) { i.classList.add('error'); mal = mal || i; } });
+            if (mal) { e.preventDefault(); mal.focus(); return; }
+            btn.disabled = true; btn.classList.add('cargando'); btn.textContent = 'Entrando...';
+        });
+    })();
     </script>
 </body>
 </html>

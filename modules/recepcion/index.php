@@ -12,38 +12,37 @@ require_once __DIR__ . '/../../includes/header.php';
 
 // Obtener datos de recepciones
 $db = Database::getInstance()->getConnection();
+
 $stmt = $db->query("
-    SELECT r.*, p.nombre AS proveedor_nombre, u.nombre AS usuario_nombre
+    SELECT r.*, 
+           COALESCE(p.nombre, c.origen_nombre) AS proveedor_nombre,
+           u.nombre AS usuario_nombre
     FROM recepciones r
     LEFT JOIN proveedores p ON r.proveedor_id = p.id
+    LEFT JOIN compras c ON r.compra_id = c.id
     LEFT JOIN usuarios u ON r.usuario_id = u.id
     ORDER BY r.fecha_recepcion DESC
     LIMIT 20
 ");
+
+
 $recepciones = $stmt->fetchAll();
 ?>
 
 <div class="table-container">
     <div class="table-header">
         <h2>📋 Recepciones recientes</h2>
-        <?php if (Permisos::puedeCrear('recepcion')): ?>
-            <a href="<?= BASE_URL ?>/recepcion/crear" class="btn btn-primary">
-                ➕ Nueva Recepción
-            </a>
-        <?php endif; ?>
+        <a href="<?= BASE_URL ?>/recepcion/compras" class="btn btn-primary">
+            Compras por recibir
+        </a>
     </div>
 
     <?php if (empty($recepciones)): ?>
-        <div style="padding: 60px 40px; text-align: center; color: #999;">
+        <div style="padding: 60px 40px; text-align: center; color: var(--tenue);">
             <div style="font-size: 4rem; margin-bottom: 15px;">📭</div>
             <h3 style="margin-bottom: 10px;">No hay recepciones registradas aún</h3>
-            <p style="margin-bottom: 25px;">Cuando llegue un camión con ganado, regístralo aquí.</p>
-            
-            <?php if (Permisos::puedeCrear('recepcion')): ?>
-                <a href="<?= BASE_URL ?>/recepcion/crear" class="btn btn-primary">
-                    ➕ Registrar primera recepción
-                </a>
-            <?php endif; ?>
+            <p style="margin-bottom: 25px;">Las recepciones se generan al recibir una compra capturada por el administrador.</p>
+            <a href="<?= BASE_URL ?>/recepcion/compras" class="btn btn-primary">Ver compras por recibir</a>
         </div>
     <?php else: ?>
         <table>
@@ -63,6 +62,7 @@ $recepciones = $stmt->fetchAll();
                     <tr>
                         <td><strong><?= htmlspecialchars($r['folio']) ?></strong></td>
                         <td><?= htmlspecialchars($r['proveedor_nombre'] ?? 'Sin proveedor') ?></td>
+
                         <td><?= date('d/m/Y H:i', strtotime($r['fecha_recepcion'])) ?></td>
                         <td><?= $r['cantidad_animales'] ?> animales</td>
                         <td>

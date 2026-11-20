@@ -59,8 +59,8 @@ $stmt = $db->prepare("
            cd.nombre AS corral_destino_nombre,
            u.nombre AS usuario_nombre, u.apellido AS usuario_apellido
     FROM movimientos_bovino mb
-    LEFT JOIN corrales co ON mb.corral_origen_id = co.id
-    LEFT JOIN corrales cd ON mb.corral_destino_id = cd.id
+    LEFT JOIN corrales_todos co ON mb.corral_origen_id = co.id
+    LEFT JOIN corrales_todos cd ON mb.corral_destino_id = cd.id
     LEFT JOIN usuarios u ON mb.usuario_id = u.id
     WHERE mb.bovino_id = ?
     ORDER BY mb.fecha DESC
@@ -79,12 +79,12 @@ $estadosLabels = [
     'clasificado' => ['label' => 'Clasificado', 'color' => '#1e88e5'],
     'en_corral' => ['label' => 'En corral', 'color' => '#28a745'],
     'en_cuarentena' => ['label' => 'En cuarentena', 'color' => '#dc3545'],
-    'vendido' => ['label' => 'Vendido', 'color' => '#6c757d'],
+    'vendido' => ['label' => 'Vendido', 'color' => 'var(--tenue)'],
     'muerto' => ['label' => 'Muerto', 'color' => '#dc3545'],
-    'devuelto' => ['label' => 'Devuelto', 'color' => '#6c757d'],
+    'devuelto' => ['label' => 'Devuelto', 'color' => 'var(--tenue)'],
 ];
 
-$estadoActual = $estadosLabels[$bovino['estado']] ?? ['label' => $bovino['estado'], 'color' => '#666'];
+$estadoActual = $estadosLabels[$bovino['estado']] ?? ['label' => $bovino['estado'], 'color' => 'var(--tenue)'];
 
 $tiposMovimiento = [
     'recepcion' => 'Recepcion',
@@ -101,7 +101,7 @@ $tiposMovimiento = [
     <div class="table-header">
         <div>
             <h2>Historial Clinico: <?= htmlspecialchars($bovino['id_siniiga']) ?></h2>
-            <p style="color: #666; font-size: 0.9rem; margin-top: 5px;">
+            <p style="color: var(--tenue); font-size: 0.9rem; margin-top: 5px;">
                 <?= $bovino['sexo'] === 'M' ? 'Macho' : 'Hembra' ?> |
                 <?= number_format($bovino['peso_entrada'], 1) ?> kg |
                 <?= htmlspecialchars($cat['subcategoria']) ?> |
@@ -119,28 +119,28 @@ $tiposMovimiento = [
     
     <!-- Datos del bovino -->
     <div style="padding: 20px; display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px;">
-        <div style="padding: 12px; background: #f8f9fa; border-radius: 6px;">
-            <div style="font-size: 0.75rem; color: #666; text-transform: uppercase; font-weight: 600;">Estado actual</div>
+        <div style="padding: 12px; background: var(--suave); border-radius: 6px;">
+            <div style="font-size: 0.75rem; color: var(--tenue); text-transform: uppercase; font-weight: 600;">Estado actual</div>
             <div style="font-size: 1rem; margin-top: 4px;">
                 <span class="badge-rol" style="background: <?= $estadoActual['color'] ?>;">
                     <?= $estadoActual['label'] ?>
                 </span>
             </div>
         </div>
-        <div style="padding: 12px; background: #f8f9fa; border-radius: 6px;">
-            <div style="font-size: 0.75rem; color: #666; text-transform: uppercase; font-weight: 600;">Corral actual</div>
+        <div style="padding: 12px; background: var(--suave); border-radius: 6px;">
+            <div style="font-size: 0.75rem; color: var(--tenue); text-transform: uppercase; font-weight: 600;">Corral actual</div>
             <div style="font-size: 1rem; margin-top: 4px;">
                 <?= htmlspecialchars($bovino['corral_nombre'] ?? 'N/A') ?>
             </div>
         </div>
-        <div style="padding: 12px; background: #f8f9fa; border-radius: 6px;">
-            <div style="font-size: 0.75rem; color: #666; text-transform: uppercase; font-weight: 600;">Recepcion</div>
+        <div style="padding: 12px; background: var(--suave); border-radius: 6px;">
+            <div style="font-size: 0.75rem; color: var(--tenue); text-transform: uppercase; font-weight: 600;">Recepcion</div>
             <div style="font-size: 1rem; margin-top: 4px;">
                 <?= htmlspecialchars($bovino['folio_recepcion'] ?? 'N/A') ?>
             </div>
         </div>
-        <div style="padding: 12px; background: #f8f9fa; border-radius: 6px;">
-            <div style="font-size: 0.75rem; color: #666; text-transform: uppercase; font-weight: 600;">Proveedor</div>
+        <div style="padding: 12px; background: var(--suave); border-radius: 6px;">
+            <div style="font-size: 0.75rem; color: var(--tenue); text-transform: uppercase; font-weight: 600;">Proveedor</div>
             <div style="font-size: 1rem; margin-top: 4px;">
                 <?= htmlspecialchars($bovino['proveedor_nombre'] ?? 'N/A') ?>
             </div>
@@ -148,12 +148,12 @@ $tiposMovimiento = [
     </div>
     
     <?php if ($bovino['en_hospital']): ?>
-    <div style="padding: 20px; background: #f8d7da; margin: 0 20px 20px; border-radius: 8px;">
-        <div style="font-size: 0.75rem; color: #721c24; text-transform: uppercase; font-weight: 600;">Motivo en hospital</div>
-        <div style="font-size: 1.1rem; margin-top: 4px; color: #721c24; font-weight: 600;">
+    <div style="padding: 20px; background: var(--f-rojo); margin: 0 20px 20px; border-radius: 8px;">
+        <div style="font-size: 0.75rem; color: var(--t-rojo); text-transform: uppercase; font-weight: 600;">Motivo en hospital</div>
+        <div style="font-size: 1.1rem; margin-top: 4px; color: var(--t-rojo); font-weight: 600;">
             <?= htmlspecialchars($bovino['motivo_hospital'] ?? 'Sin especificar') ?>
         </div>
-        <div style="margin-top: 8px; color: #721c24; font-size: 0.9rem;">
+        <div style="margin-top: 8px; color: var(--t-rojo); font-size: 0.9rem;">
             Ingresado el <?= date('d/m/Y H:i', strtotime($bovino['fecha_entrada_hospital'])) ?>
         </div>
     </div>
@@ -205,7 +205,7 @@ $tiposMovimiento = [
         </tbody>
     </table>
     <?php else: ?>
-    <div style="padding: 40px; text-align: center; color: #999;">
+    <div style="padding: 40px; text-align: center; color: var(--tenue);">
         No hay tratamientos registrados para este bovino.
     </div>
     <?php endif; ?>
@@ -247,7 +247,7 @@ $tiposMovimiento = [
         </tbody>
     </table>
     <?php else: ?>
-    <div style="padding: 40px; text-align: center; color: #999;">
+    <div style="padding: 40px; text-align: center; color: var(--tenue);">
         No hay movimientos registrados para este bovino.
     </div>
     <?php endif; ?>

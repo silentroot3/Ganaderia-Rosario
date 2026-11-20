@@ -1,4 +1,9 @@
 RewriteEngine On
+
+# Bloquear .git, .gitignore y archivos de ejemplo/respaldo desde el navegador
+RewriteRule (^|/)\.git(/|$|ignore) - [F,L]
+RewriteRule \.(bak[^/]*|sql)$ - [F,L]
+RewriteRule ^includes/config\.example\.php$ - [F,L]
 RewriteBase /
 
 # ============================================
@@ -10,7 +15,10 @@ RewriteRule ^recepcion/crear/?$ modules/recepcion/crear.php [L,QSA]
 RewriteRule ^recepcion/bovinos/?$ modules/recepcion/bovinos.php [L,QSA]
 RewriteRule ^recepcion/detalle/?$ modules/recepcion/detalle.php [L,QSA]
 RewriteRule ^recepcion/exportar/?$ modules/recepcion/exportar.php [L,QSA]
+RewriteRule ^recepcion/compras/?$               modules/recepcion/compras.php [L,QSA]
+RewriteRule ^recepcion/recibir-compra/?$        modules/recepcion/recibir-compra.php [L,QSA]
 RewriteRule ^bovinos/?$ modules/bovinos/index.php [L,QSA]
+RewriteRule ^bovinos/muerte/?$ modules/bovinos/muerte.php [L,QSA]
 
 # ============================================
 # MODULO VETERINARIO (sanidad)
@@ -20,6 +28,7 @@ RewriteRule ^sanidad/atender/?$         modules/sanidad/atender.php [L,QSA]
 RewriteRule ^sanidad/alta/?$            modules/sanidad/alta.php [L,QSA]
 RewriteRule ^sanidad/historial/?$       modules/sanidad/historial.php [L,QSA]
 RewriteRule ^sanidad/tratamiento/?$     modules/sanidad/tratamiento.php [L,QSA]
+RewriteRule ^sanidad/dosis/?$           modules/sanidad/dosis.php [L,QSA]
 
 
 
@@ -34,7 +43,98 @@ RewriteRule ^reportes/?$ modules/reportes/index.php [L,QSA]
 RewriteRule ^trazabilidad/?$ modules/trazabilidad/index.php [L,QSA]
 RewriteRule ^alertas/?$ modules/alertas/index.php [L,QSA]
 RewriteRule ^usuarios/?$ modules/usuarios/index.php [L,QSA]
-RewriteRule ^configuracion/?$ modules/configuracion/index.php [L,QSA]
+
+# ============================================
+# MODULO CONFIGURACION - COMPRAS
+# ============================================
+RewriteRule ^configuracion/?$                       modules/configuracion/index.php [L,QSA]
+RewriteRule ^configuracion/compras/?$               modules/configuracion/compras/index.php [L,QSA]
+RewriteRule ^configuracion/compras/crear/?$         modules/configuracion/compras/crear.php [L,QSA]
+RewriteRule ^configuracion/compras/detalle/?$       modules/configuracion/compras/detalle.php [L,QSA]
+RewriteRule ^configuracion/compras/cancelar/?$      modules/configuracion/compras/cancelar.php [L,QSA]
+RewriteRule ^configuracion/compras/editar/?$        modules/configuracion/compras/editar.php [L,QSA]
+RewriteRule ^configuracion/compras/guia/?$          modules/configuracion/compras/guia.php [L,QSA]
+
+# ============================================
+# MODULO CORRALES
+# ============================================
+RewriteRule ^corrales/?$                modules/corrales/index.php [L,QSA]
+RewriteRule ^corrales/crear/?$          modules/corrales/crear.php [L,QSA]
+RewriteRule ^corrales/editar/?$         modules/corrales/editar.php [L,QSA]
+RewriteRule ^corrales/ver/?$            modules/corrales/ver.php [L,QSA]
+RewriteRule ^corrales/toggle/?$         modules/corrales/toggle.php [L,QSA]
+RewriteRule ^corrales/migrar/?$         modules/corrales/migrar.php [L,QSA]
+RewriteRule ^corrales/eliminar/?$       modules/corrales/eliminar.php [L,QSA]
+
+# ============================================
+# MODULO CLASIFICACION
+# ============================================
+RewriteRule ^clasificacion/?$                modules/clasificacion/index.php [L,QSA]
+RewriteRule ^clasificacion/asignar/?$        modules/clasificacion/asignar.php [L,QSA]
+RewriteRule ^clasificacion/enviar-vet/?$     modules/clasificacion/enviar-vet.php [L,QSA]
+RewriteRule ^clasificacion/pesar/?$          modules/clasificacion/pesar.php [L,QSA]
+
+
+
+# ============================================
+# MODULO USUARIOS
+# ============================================
+RewriteRule ^usuarios/?$                modules/usuarios/index.php [L,QSA]
+RewriteRule ^usuarios/crear/?$          modules/usuarios/crear.php [L,QSA]
+RewriteRule ^usuarios/editar/?$         modules/usuarios/editar.php [L,QSA]
+RewriteRule ^usuarios/toggle/?$         modules/usuarios/toggle.php [L,QSA]
+RewriteRule ^usuarios/reset/?$          modules/usuarios/reset.php [L,QSA]
+# ============================================
+# MODULO ALIMENTACION
+# ============================================
+RewriteRule ^alimentacion/?$              modules/alimentacion/index.php [L,QSA]
+RewriteRule ^alimentacion/dietas/?$       modules/alimentacion/dietas.php [L,QSA]
+RewriteRule ^alimentacion/inventario/?$   modules/alimentacion/inventario.php [L,QSA]
+RewriteRule ^alimentacion/registrar/?$    modules/alimentacion/registrar.php [L,QSA]
+RewriteRule ^alimentacion/historial/?$    modules/alimentacion/historial.php [L,QSA]
+RewriteRule ^alimentacion/entradas/?$     modules/alimentacion/entradas.php [L,QSA]
+RewriteRule ^alimentacion/mezclas/?$      modules/alimentacion/mezclas.php [L,QSA]
+RewriteRule ^alimentacion/control/?$      modules/alimentacion/control.php [L,QSA]
+RewriteRule ^alimentacion/repartir/?$     modules/alimentacion/repartir.php [L,QSA]
+RewriteRule ^alimentacion/corrales/?$     modules/alimentacion/corrales.php [L,QSA]
+
+
+
+# ============================================
+# MODULOS SEMANAS 6-9 (tratamientos, seguimiento, costos, ventas,
+# reportes, trazabilidad, solicitudes, bovinos, config)
+# ============================================
+RewriteRule ^tratamientos/crear/?$        modules/tratamientos/crear.php [L,QSA]
+RewriteRule ^tratamientos/inventario/?$   modules/tratamientos/inventario.php [L,QSA]
+
+RewriteRule ^solicitudes/?$               modules/solicitudes/index.php [L,QSA]
+RewriteRule ^solicitudes/crear/?$         modules/solicitudes/crear.php [L,QSA]
+RewriteRule ^solicitudes/hoja/?$          modules/solicitudes/hoja.php [L,QSA]
+
+RewriteRule ^seguimiento/registrar/?$     modules/seguimiento/registrar.php [L,QSA]
+
+RewriteRule ^costos/animal/?$             modules/costos/animal.php [L,QSA]
+RewriteRule ^costos/gasto/?$              modules/costos/gasto.php [L,QSA]
+
+# COMPRAS (ganado, alimento y medicamento)
+RewriteRule ^compras/?$                 modules/compras/index.php [L,QSA]
+RewriteRule ^compras/ganado/?$          modules/configuracion/compras/index.php [L,QSA]
+# PROVEEDORES
+RewriteRule ^proveedores/?$             modules/proveedores/index.php [L,QSA]
+RewriteRule ^proveedores/ver/?$         modules/proveedores/ver.php [L,QSA]
+RewriteRule ^proveedores/editar/?$      modules/proveedores/editar.php [L,QSA]
+RewriteRule ^ventas/crear/?$              modules/ventas/crear.php [L,QSA]
+RewriteRule ^ventas/detalle/?$            modules/ventas/detalle.php [L,QSA]
+RewriteRule ^ventas/cancelar/?$           modules/ventas/cancelar.php [L,QSA]
+RewriteRule ^ventas/precios/?$            modules/ventas/precios.php [L,QSA]
+RewriteRule ^ventas/descuentos/?$         modules/ventas/descuentos.php [L,QSA]
+
+RewriteRule ^reportes/exportar/?$         modules/reportes/exportar.php [L,QSA]
+
+RewriteRule ^trazabilidad/ver/?$          modules/trazabilidad/ver.php [L,QSA]
+
+RewriteRule ^configuracion/empresa/?$     modules/configuracion/ajustes.php [L,QSA]
+RewriteRule ^configuracion/backup/?$      modules/configuracion/backup.php [L,QSA]
 
 # ============================================
 # ERRORES

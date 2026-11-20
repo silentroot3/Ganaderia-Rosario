@@ -1,80 +1,72 @@
 <?php
 /**
- * Sidebar dinámico según permisos del usuario
+ * Menu lateral: logo, modulos agrupados por seccion (segun permisos) y usuario.
  */
 if (!isset($_SESSION['user_id'])) {
     return;
 }
+require_once __DIR__ . '/iconos.php';
 
 $modulosVisibles = Permisos::modulosVisibles();
-$moduloActual = basename(dirname($_SERVER['PHP_SELF']));
-
-// Ajustar nombre según la ruta
-$rutaActual = $_SERVER['REQUEST_URI'] ?? '';
+$rutaActual = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?: '';
 
 $infoUsuario = [
     'nombre' => $_SESSION['nombre'] ?? 'Usuario',
     'apellido' => $_SESSION['apellido'] ?? '',
-    'email' => $_SESSION['email'] ?? '',
     'rol' => $_SESSION['rol'] ?? 'invitado',
 ];
-
-$inicial = strtoupper(substr($infoUsuario['nombre'], 0, 1));
-
-$coloresRol = [
-    'admin' => '#226633',
-    'recepcionista' => '#1e88e5',
-    'veterinario' => '#43a047',
-    'clasificador' => '#fbc02d',
-    'alimentador' => '#8e24aa',
-];
-
-$colorRol = $coloresRol[$infoUsuario['rol']] ?? '#666';
+$inicial = mb_strtoupper(mb_substr($infoUsuario['nombre'], 0, 1));
+$nombresRol = ['admin' => 'Administrador', 'recepcionista' => 'Recepción', 'veterinario' => 'Veterinario',
+               'clasificador' => 'Clasificador', 'alimentador' => 'Alimentador', 'vendedor' => 'Vendedor'];
+$imgV = @filemtime(BASE_PATH . '/assets/img/logo-horizontal.png');
 ?>
+<div class="sidebar-velo" onclick="toggleSidebar()"></div>
+<aside class="sidebar" id="sidebar">
+    <a href="<?= BASE_URL ?>/dashboard" class="sidebar-brand" title="Ganadería El Rosario">
+        <img src="<?= BASE_URL ?>/assets/img/logo-horizontal.png?v=<?= $imgV ?>" alt="Ganadería El Rosario" width="196" height="53">
+    </a>
 
-<aside class="sidebar">
-    <!-- Logo / Marca -->
-    <div class="sidebar-brand">
-        <span class="sidebar-logo">🐄</span>
-        <div class="sidebar-brand-text">
-            <h2>El Rosario</h2>
-            <small>Sistema Ganadero</small>
-        </div>
-    </div>
-
-    <!-- Info del usuario -->
-    <div class="sidebar-user">
-        <div class="user-avatar" style="background-color: <?= $colorRol ?>">
-            <?= $inicial ?>
-        </div>
-        <div class="user-info">
-            <span class="user-name">
-                <?= htmlspecialchars($infoUsuario['nombre'] . ' ' . $infoUsuario['apellido']) ?>
-            </span>
-            <span class="user-rol" style="background-color: <?= $colorRol ?>">
-                <?= htmlspecialchars($infoUsuario['rol']) ?>
-            </span>
-        </div>
-    </div>
-
-    <!-- Navegación -->
     <nav class="sidebar-nav">
-        <?php foreach ($modulosVisibles as $clave => $info): ?>
-            <?php
-                // Detectar si estamos en ese módulo
-                $activo = (strpos($rutaActual, $info['url']) !== false) ? 'active' : '';
-            ?>
-            <a href="<?= BASE_URL . $info['url'] ?>" class="nav-item <?= $activo ?>">
-                <span class="nav-icon"><?= $info['icono'] ?></span>
-                <span class="nav-text"><?= $info['titulo'] ?></span>
+        <?php $seccion = null;
+        foreach ($modulosVisibles as $clave => $info):
+            if (($info['seccion'] ?? '') !== $seccion):
+                $seccion = $info['seccion'] ?? '';
+                if ($seccion !== ''): ?><div class="nav-seccion"><?= htmlspecialchars($seccion) ?></div><?php endif;
+            endif;
+            $activo = false;
+            foreach (array_merge([$info['url']], $info['alias'] ?? []) as $u) {
+                if ($rutaActual === $u || str_starts_with($rutaActual, $u . '/')) $activo = true;
+            } ?>
+            <a href="<?= BASE_URL . $info['url'] ?>" class="nav-item<?= $activo ? ' active' : '' ?>"<?= $activo ? ' aria-current="page"' : '' ?>>
+                <?= icono($info['icono']) ?>
+                <span class="nav-text"><?= htmlspecialchars($info['titulo']) ?></span>
             </a>
         <?php endforeach; ?>
     </nav>
 
-    <!-- Footer del sidebar -->
-    <div class="sidebar-footer">
-        <a href="<?= BASE_URL ?>/logout" class="btn-logout-sidebar">
-            <span>🚪</span> Cerrar Sesión
-        </a>
+    <div class="sidebar-user">
+        <div class="user-avatar rol-<?= htmlspecialchars($infoUsuario['rol']) ?>"><?= htmlspecialchars($inicial) ?></div>
+        <div class="user-info">
+            <span class="user-name"><?= htmlspecialchars(trim($infoUsuario['nombre'] . ' ' . $infoUsuario['apellido'])) ?></span>
+            <span class="user-rol"><?= htmlspecialchars($nombresRol[$infoUsuario['rol']] ?? $infoUsuario['rol']) ?></span>
+        </div>
+        <a href="<?= BASE_URL ?>/logout" class="btn-salir" title="Cerrar sesión"><?= icono('salir', 18) ?></a>
     </div>
 </aside>
+<script>
+// Recordar donde estaba la lista de modulos al cambiar de pagina
+(function () {
+    var nav = document.querySelector('.sidebar-nav');
+    if (!nav) return;
+    var k = 'sidebarScroll';
+    try { var y = sessionStorage.getItem(k); if (y !== null) nav.scrollTop = +y; } catch (e) {}
+    var act = nav.querySelector('.nav-item.active');
+    if (act) {
+        var top = act.offsetTop - nav.offsetTop, bottom = top + act.offsetHeight;
+        if (top < nav.scrollTop || bottom > nav.scrollTop + nav.clientHeight) nav.scrollTop = top - nav.clientHeight / 2 + act.offsetHeight / 2;
+    }
+    var guardar = function () { try { sessionStorage.setItem(k, nav.scrollTop); } catch (e) {} };
+    nav.addEventListener('scroll', guardar, {passive: true});
+    nav.addEventListener('click', guardar);
+})();
+</script>

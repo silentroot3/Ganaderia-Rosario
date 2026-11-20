@@ -29,7 +29,7 @@ $titulo = 'Acceso Denegado';
         .error-title { font-size: 1.8rem; color: #333; margin: 1rem 0; }
         .error-message { color: #666; margin-bottom: 2rem; }
         .btn-home {
-            background: #226633;
+            background: #0b4f86;
             color: white;
             padding: 12px 30px;
             border-radius: 6px;

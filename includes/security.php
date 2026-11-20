@@ -46,7 +46,8 @@ function verificarRateLimiting($email) {
         [$ip]
     );
     
-    if ($result && $result['intentos'] >= 10) {
+    // Todos los empleados suelen entrar desde la misma red/IP: limite alto para no bloquear a todos por los errores de uno
+    if ($result && $result['intentos'] >= 30) {
         return false; // Demasiados intentos desde esta IP
     }
     
@@ -125,9 +126,9 @@ function crearSesionUsuario($usuario) {
         ]
     );
 
-    // Actualizar último acceso
+    // Actualizar último acceso y limpiar intentos fallidos (si no, se acumulaban hasta bloquear la cuenta)
     $db->execute(
-        "UPDATE usuarios SET ultimo_acceso = NOW() WHERE id = ?",
+        "UPDATE usuarios SET ultimo_acceso = NOW(), intentos_fallidos = 0, bloqueado_hasta = NULL WHERE id = ?",
         [$usuario['id']]
     );
 

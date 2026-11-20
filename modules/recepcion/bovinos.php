@@ -290,7 +290,7 @@ foreach ($bovinos as $b) {
     <div class="table-header">
         <div>
             <h2>Recepcion: <?= htmlspecialchars($recepcion['folio']) ?></h2>
-            <p style="color: #666; font-size: 0.9rem; margin-top: 5px;">
+            <p style="color: var(--tenue); font-size: 0.9rem; margin-top: 5px;">
                 Proveedor: <strong><?= htmlspecialchars($recepcion['proveedor_nombre'] ?? 'N/A') ?></strong> |
                 Chofer: <strong><?= htmlspecialchars($recepcion['chofer'] ?? 'N/A') ?></strong> |
                 Placas: <strong><?= htmlspecialchars($recepcion['placas'] ?? 'N/A') ?></strong>
@@ -321,7 +321,7 @@ foreach ($bovinos as $b) {
         <div class="stat-label">Muertos</div>
         <div class="stat-value"><?= $muertos ?></div>
     </div>
-    <div class="stat-card" style="border-left-color: #6c757d;">
+    <div class="stat-card" style="border-left-color: var(--tenue);">
         <div class="stat-label">Devueltos</div>
         <div class="stat-value"><?= $devueltos ?></div>
     </div>
@@ -343,7 +343,7 @@ foreach ($bovinos as $b) {
         <input type="hidden" name="accion" value="agregar">
         
         <!-- Selector de estado -->
-        <div style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+        <div style="margin-bottom: 20px; padding: 15px; background: var(--suave); border-radius: 8px;">
             <label style="display: block; margin-bottom: 10px; font-weight: 600;">Estado del bovino:</label>
             <div style="display: flex; gap: 20px;">
                 <label style="display: flex; align-items: center; cursor: pointer;">
@@ -356,7 +356,7 @@ foreach ($bovinos as $b) {
                 </label>
                 <label style="display: flex; align-items: center; cursor: pointer;">
                     <input type="radio" name="estado_bovino" value="devuelto" onchange="toggleEstado()" style="margin-right: 8px;">
-                    <span style="color: #6c757d;">Devuelto al proveedor</span>
+                    <span style="color: var(--tenue);">Devuelto al proveedor</span>
                 </label>
             </div>
         </div>
@@ -367,14 +367,14 @@ foreach ($bovinos as $b) {
                 <input type="text" name="id_siniiga" maxlength="12" pattern="\d{12}" 
                        placeholder="123456789012" required
                        oninput="this.value = this.value.replace(/\D/g, '')"
-                       style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+                       style="width: 100%; padding: 10px; border: 1px solid var(--linea); border-radius: 6px;">
             </div>
             
             <div>
                 <label style="display: block; margin-bottom: 5px; font-weight: 600; font-size: 0.85rem;">Sexo *</label>
 
                 	<select name="sexo" id="sexo"
-                        style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+                        style="width: 100%; padding: 10px; border: 1px solid var(--linea); border-radius: 6px;">
                     <option value="">-- Seleccionar --</option>
                     <option value="M">Macho</option>
                     <option value="H">Hembra</option>
@@ -386,36 +386,36 @@ foreach ($bovinos as $b) {
 
                 <input type="number" name="peso_entrada" id="peso" step="0.1" min="1"
                        placeholder="Ej: 250" required
-                       style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+                       style="width: 100%; padding: 10px; border: 1px solid var(--linea); border-radius: 6px;">
             </div>
             
             <div>
                 <label style="display: block; margin-bottom: 5px; font-weight: 600; font-size: 0.85rem;">Raza</label>
                 <input type="text" name="raza" placeholder="Ej: Angus"
-                       style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+                       style="width: 100%; padding: 10px; border: 1px solid var(--linea); border-radius: 6px;">
             </div>
             
             <div>
                 <label style="display: block; margin-bottom: 5px; font-weight: 600; font-size: 0.85rem;">Edad (meses)</label>
                 <input type="number" name="edad_meses" min="0" placeholder="Ej: 12"
-                       style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+                       style="width: 100%; padding: 10px; border: 1px solid var(--linea); border-radius: 6px;">
             </div>
             
             <div>
                 <label style="display: block; margin-bottom: 5px; font-weight: 600; font-size: 0.85rem;">Color</label>
                 <input type="text" name="color" placeholder="Ej: Cafe"
-                       style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+                       style="width: 100%; padding: 10px; border: 1px solid var(--linea); border-radius: 6px;">
             </div>
         </div>
         
         <div style="margin-top: 15px;">
             <label style="display: block; margin-bottom: 5px; font-weight: 600; font-size: 0.85rem;">Observaciones</label>
             <textarea name="observaciones" rows="2" placeholder="Notas sobre este bovino..."
-                      style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;"></textarea>
+                      style="width: 100%; padding: 10px; border: 1px solid var(--linea); border-radius: 6px;"></textarea>
         </div>
         
         <!-- Campos para VIVO (enfermo) -->
-        <div id="vivoFields" style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #226633;">
+        <div id="vivoFields" style="margin-top: 20px; padding: 15px; background: var(--suave); border-radius: 8px; border-left: 4px solid #0b4f86;">
             <label style="display: flex; align-items: center; font-weight: 600; cursor: pointer;">
                 <input type="checkbox" name="es_enfermo" id="es_enfermo" value="1" 
                        onchange="toggleHospital()" style="margin-right: 10px; transform: scale(1.3);">
@@ -425,7 +425,7 @@ foreach ($bovinos as $b) {
             <div id="hospitalFields" style="display: none; margin-top: 15px;">
                 <label style="display: block; margin-bottom: 5px; font-weight: 600; font-size: 0.85rem;">Motivo *</label>
                 <select name="motivo_hospital" id="motivo_hospital"
-                        style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+                        style="width: 100%; padding: 10px; border: 1px solid var(--linea); border-radius: 6px;">
                     <option value="">-- Seleccionar motivo --</option>
                     <option value="Diarrea">Diarrea</option>
                     <option value="Diarrea con sangre">Diarrea con sangre</option>
@@ -441,11 +441,11 @@ foreach ($bovinos as $b) {
         </div>
         
         <!-- Campos para BAJA (muerto / devuelto) -->
-        <div id="bajaFields" style="display: none; margin-top: 20px; padding: 15px; background: #f8d7da; border-radius: 8px; border-left: 4px solid #dc3545;">
+        <div id="bajaFields" style="display: none; margin-top: 20px; padding: 15px; background: var(--f-rojo); border-radius: 8px; border-left: 4px solid #dc3545;">
             <div>
                 <label style="display: block; margin-bottom: 5px; font-weight: 600; font-size: 0.85rem;">Motivo de la baja *</label>
                 <select name="motivo_baja" id="motivo_baja"
-                        style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+                        style="width: 100%; padding: 10px; border: 1px solid var(--linea); border-radius: 6px;">
                     <option value="">-- Seleccionar motivo --</option>
                     <option value="Muerte en traslado">Muerte en traslado</option>
                     <option value="Enfermedad detectada al llegar">Enfermedad detectada al llegar</option>
@@ -460,7 +460,7 @@ foreach ($bovinos as $b) {
             <div style="margin-top: 15px;">
                 <label style="display: block; margin-bottom: 5px; font-weight: 600; font-size: 0.85rem;">Observaciones de la baja</label>
                 <textarea name="observaciones_baja" rows="2" placeholder="Detalles especificos de esta baja..."
-                          style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;"></textarea>
+                          style="width: 100%; padding: 10px; border: 1px solid var(--linea); border-radius: 6px;"></textarea>
             </div>
         </div>
         <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end;">
@@ -491,7 +491,7 @@ foreach ($bovinos as $b) {
     <tbody>
         <?php foreach ($bovinos as $b): 
             $esBaja = in_array($b['estado'], ['muerto', 'devuelto']);
-            $rowStyle = $esBaja ? 'background: #f8d7da; color: #721c24; font-weight: 500;' : '';
+            $rowStyle = $esBaja ? 'background: var(--f-rojo); color: var(--t-rojo); font-weight: 500;' : '';
         ?>
         <tr style="<?= $rowStyle ?>">
             <td><strong><?= htmlspecialchars($b['id_siniiga']) ?></strong></td>
@@ -502,7 +502,7 @@ foreach ($bovinos as $b) {
                 <?php if ($b['estado'] === 'muerto'): ?>
                     <span style="color: #dc3545;">-</span>
                 <?php elseif ($b['estado'] === 'devuelto'): ?>
-                    <span style="color: #6c757d;">-</span>
+                    <span style="color: var(--tenue);">-</span>
                 <?php elseif (!empty($b['en_hospital'])): ?>
                     <span class="badge-rol badge-recepcionista">
                         <?= htmlspecialchars($b['corral_nombre'] ?? 'HOSPITAL') ?>
@@ -517,7 +517,7 @@ foreach ($bovinos as $b) {
                 <?php if ($b['estado'] === 'muerto'): ?>
                     <strong style="color: #dc3545;">MUERTO</strong>
                 <?php elseif ($b['estado'] === 'devuelto'): ?>
-                    <strong style="color: #6c757d;">DEVUELTO</strong>
+                    <strong style="color: var(--tenue);">DEVUELTO</strong>
                 <?php elseif (!empty($b['en_hospital'])): ?>
                     <strong style="color: #dc3545;">Hospital</strong>
                 <?php else: ?>
